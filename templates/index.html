@@ -2,6 +2,8 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
+<!-- 针对手机浏览器增加的视口适配 -->
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>PingMonitor</title>
 
 <style>
@@ -88,6 +90,7 @@ border-radius:10px;
 font-family:Consolas,monospace;
 }
 
+/* 移动端专属响应式样式 */
 @media(max-width:768px){
 h1{
 padding:18px;
@@ -103,7 +106,7 @@ overflow-x:auto;
 white-space:nowrap;
 }
 input{
-width:100%;
+width:100% !important;
 margin:6px 0;
 }
 button{
