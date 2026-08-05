@@ -7,69 +7,89 @@
 
 <title>PingMonitor</title>
 
+
 <style>
 
 body{
-font-family:Arial;
-margin:30px;
-background:#f5f5f5;
+    font-family:Arial;
+    background:#f4f4f4;
+    margin:30px;
 }
 
 
 .box{
-background:white;
-padding:20px;
-margin-bottom:20px;
-border-radius:8px;
-}
 
+    background:white;
+    padding:20px;
+    margin-bottom:20px;
+    border-radius:10px;
 
-input{
-padding:8px;
-margin:5px;
-}
-
-
-button{
-padding:8px 15px;
-cursor:pointer;
 }
 
 
 table{
-width:100%;
-border-collapse:collapse;
+
+    width:100%;
+    border-collapse:collapse;
+
 }
 
 
-td,th{
-border-bottom:1px solid #ddd;
-padding:10px;
+th,td{
+
+    padding:10px;
+    border-bottom:1px solid #ddd;
+    text-align:center;
+
 }
 
 
 .online{
-color:green;
-font-weight:bold;
+
+    color:green;
+    font-weight:bold;
+
 }
 
 
 .offline{
-color:red;
-font-weight:bold;
+
+    color:red;
+    font-weight:bold;
+
+}
+
+
+input{
+
+    padding:8px;
+    margin:5px;
+
+}
+
+
+button{
+
+    padding:8px 15px;
+    cursor:pointer;
+
 }
 
 
 #logs{
-height:300px;
-overflow:auto;
-background:#111;
-color:#0f0;
-padding:10px;
-font-family:monospace;
+
+    background:#111;
+    color:#0f0;
+    height:300px;
+    overflow:auto;
+    padding:15px;
+    font-family:monospace;
+
 }
 
+
 </style>
+
 
 </head>
 
@@ -80,6 +100,7 @@ font-family:monospace;
 <h1>PingMonitor</h1>
 
 
+
 <div class="box">
 
 
@@ -88,24 +109,33 @@ font-family:monospace;
 
 <table>
 
+
 <thead>
 
 <tr>
 
 <th>名称</th>
+
 <th>IP</th>
+
 <th>状态</th>
+
 <th>延迟</th>
-<th>失败次数</th>
+
 <th>最后检测</th>
+
+<th>失败次数</th>
+
 <th>操作</th>
 
 </tr>
+
 
 </thead>
 
 
 <tbody id="nodes">
+
 
 </tbody>
 
@@ -123,8 +153,11 @@ font-family:monospace;
 
 
 <button onclick="addNode()">
+
 添加
+
 </button>
+
 
 
 </div>
@@ -132,67 +165,102 @@ font-family:monospace;
 
 
 
+
 <div class="box">
+
 
 <h3>Telegram Worker</h3>
 
-<input id="worker" style="width:400px">
+
+<input id="worker"
+style="width:400px">
+
 
 <button onclick="saveWorker()">
+
 保存
+
 </button>
+
 
 </div>
 
 
 
 
+
 <div class="box">
+
 
 <h3>检测间隔</h3>
 
-<input id="interval" type="number">
+
+<input id="interval"
+type="number">
+
 
 秒
 
+
 <button onclick="saveInterval()">
+
 保存
+
 </button>
+
 
 </div>
 
 
 
 
+
 <div class="box">
+
 
 <h3>服务控制</h3>
 
+
 <button onclick="service('start')">
-开始监控
+
+启动
+
 </button>
+
 
 <button onclick="service('stop')">
-停止监控
+
+停止
+
 </button>
 
+
 <button onclick="service('restart')">
-重启监控
+
+重启
+
 </button>
 
 
 </div>
+
+
 
 
 
 
 <div class="box">
 
+
 <h3>实时日志</h3>
 
+
 <div id="logs">
+
 加载中...
+
 </div>
+
 
 </div>
 
@@ -205,54 +273,107 @@ font-family:monospace;
 
 async function loadConfig(){
 
-let r=await fetch('/api/config');
 
-let c=await r.json();
+let r =
+await fetch(
+"/api/config"
+);
+
+
+let c =
+await r.json();
+
+
+
+document.getElementById(
+"worker"
+).value =
+c.worker || "";
+
+
+
+document.getElementById(
+"interval"
+).value =
+c.interval || 60;
+
+
+}
+
+
+
+async function loadStatus(){
+
+
+let r =
+await fetch(
+"/api/status"
+);
+
+
+let data =
+await r.json();
+
 
 
 let html="";
 
 
-c.nodes.forEach(n=>{
+
+data.forEach(n=>{
 
 
-html+=`
+let cls =
+n.status=="在线"
+?
+"online"
+:
+"offline";
+
+
+
+html += `
+
 
 <tr>
 
+
 <td>${n.name}</td>
+
 
 <td>${n.ip}</td>
 
 
-<td>
+<td class="${cls}">
 
-${
-n.status=="在线"
-
-?
-
-'<span class="online">🟢 在线</span>'
-
-:
-
-'<span class="offline">🔴 '+n.status+'</span>'
-
-}
+${n.status}
 
 </td>
 
 
-<td>${n.delay || "-"}</td>
+<td>
 
+${n.delay}
 
-<td>${n.fail || 0}</td>
-
-
-<td>${n.last || "-"}</td>
+</td>
 
 
 <td>
+
+${n.last}
+
+</td>
+
+
+<td>
+
+${n.fail}
+
+</td>
+
+
+<td>
+
 
 <button onclick="delNode('${n.ip}')">
 
@@ -260,164 +381,259 @@ n.status=="在线"
 
 </button>
 
+
 </td>
 
 
 </tr>
 
+
 `;
+
 
 });
 
 
+
 document.getElementById(
 "nodes"
-).innerHTML=html;
-
-
-document.getElementById(
-"worker"
-).value=c.worker || "";
-
-
-document.getElementById(
-"interval"
-).value=c.interval || 60;
+).innerHTML =
+html;
 
 
 }
+
 
 
 
 async function addNode(){
 
+
 await fetch(
 "/api/add",
 {
+
 method:"POST",
+
 headers:{
 "Content-Type":"application/json"
 },
+
+
 body:JSON.stringify({
 
 name:
-document.getElementById("name").value,
+document.getElementById(
+"name"
+).value,
+
 
 ip:
-document.getElementById("ip").value
+document.getElementById(
+"ip"
+).value
+
 
 })
-});
 
-
-loadConfig();
 
 }
+);
+
+
+
+loadStatus();
+
+
+}
+
 
 
 
 async function delNode(ip){
 
+
 await fetch(
 "/api/delete",
 {
+
 method:"POST",
+
 headers:{
 "Content-Type":"application/json"
 },
+
+
 body:JSON.stringify({
+
 ip:ip
+
 })
-});
 
-
-loadConfig();
 
 }
+);
+
+
+
+loadStatus();
+
+
+}
+
+
 
 
 
 async function saveWorker(){
 
+
 await fetch(
 "/api/worker",
 {
+
 method:"POST",
+
 headers:{
 "Content-Type":"application/json"
 },
+
+
 body:JSON.stringify({
 
 worker:
-document.getElementById("worker").value
+document.getElementById(
+"worker"
+).value
 
 })
-});
 
-
-alert("保存成功");
 
 }
+);
+
+
+
+alert(
+"保存成功"
+);
+
+
+}
+
+
+
+
 
 
 
 async function saveInterval(){
 
+
 await fetch(
 "/api/interval",
 {
+
 method:"POST",
+
 headers:{
 "Content-Type":"application/json"
 },
+
+
 body:JSON.stringify({
 
 interval:
-document.getElementById("interval").value
+document.getElementById(
+"interval"
+).value
 
 })
-});
 
-
-alert("检测间隔已修改");
 
 }
+);
+
+
+
+alert(
+"检测间隔已修改"
+);
+
+
+}
+
+
 
 
 
 
 async function service(a){
 
+
 await fetch(
 "/api/service/"+a
 );
 
+
 }
+
+
 
 
 
 async function loadLogs(){
 
-let r=await fetch(
+
+let r =
+await fetch(
 "/api/logs"
 );
 
 
-let logs=await r.json();
+let data =
+await r.json();
 
 
+
+let box =
 document.getElementById(
 "logs"
-).innerHTML=
-logs.join("<br>");
+);
+
+
+
+box.innerHTML =
+data.join(
+"<br>"
+);
+
+
+
+box.scrollTop =
+box.scrollHeight;
+
+
 
 }
 
 
 
+
+
 loadConfig();
 
+loadStatus();
+
 loadLogs();
+
+
+
+setInterval(
+loadStatus,
+5000
+);
+
 
 
 setInterval(
@@ -426,13 +642,9 @@ loadLogs,
 );
 
 
-setInterval(
-loadConfig,
-10000
-);
-
 
 </script>
+
 
 
 </body>
