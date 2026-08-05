@@ -1,0 +1,3 @@
+www-data ALL=(ALL) NOPASSWD: /bin/systemctl start pingmonitor
+www-data ALL=(ALL) NOPASSWD: /bin/systemctl stop pingmonitor
+www-data ALL=(ALL) NOPASSWD: /bin/systemctl restart pingmonitor
