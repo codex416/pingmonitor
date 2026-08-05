@@ -4,9 +4,8 @@
 import json
 import time
 import subprocess
-import requests
 import threading
-import os
+import requests
 from datetime import datetime
 
 
@@ -17,40 +16,36 @@ CONFIG = BASE_DIR + "/config.json"
 class Monitor:
 
     def __init__(self):
-        self.load()
+        self.running_nodes = {}
 
 
-    def load(self):
-
-        try:
-            with open(CONFIG, "r", encoding="utf-8") as f:
-                data = json.load(f)
-
-            self.nodes = data.get("nodes", [])
-            self.worker = data.get("worker", "")
-            self.interval = data.get("interval", 60)
-
-        except:
-
-            self.nodes = []
-            self.worker = ""
-            self.interval = 60
-
-
-
-    def log(self,msg):
+    def log(self, msg):
 
         print(
-            datetime.now().strftime(
-                "%Y-%m-%d %H:%M:%S"
-            ),
+            datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             msg,
             flush=True
         )
 
 
+    def load_config(self):
 
-    def ping(self,ip):
+        try:
+
+            with open(CONFIG, "r", encoding="utf-8") as f:
+                return json.load(f)
+
+        except:
+
+            return {
+                "nodes": [],
+                "worker": "",
+                "interval": 60
+            }
+
+
+
+    def ping(self, ip):
 
         try:
 
@@ -76,19 +71,19 @@ class Monitor:
 
 
 
-    def notify(self,node):
+    def notify(self, node, worker):
 
-        if not self.worker:
+        if not worker:
             return
 
 
-        data={
+        data = {
 
-            "name":node["name"],
+            "name": node["name"],
 
-            "ip":node["ip"],
+            "ip": node["ip"],
 
-            "status":"DOWN",
+            "status": "DOWN",
 
             "time":
             datetime.now().strftime(
@@ -101,26 +96,27 @@ class Monitor:
         try:
 
             requests.post(
-                self.worker,
+                worker,
                 json=data,
                 timeout=10
             )
 
             self.log(
-                "TG通知成功"
+                node["name"]+
+                " TG通知成功"
             )
 
 
         except Exception as e:
 
             self.log(
-                "TG通知失败:"
+                "TG失败:"
                 +str(e)
             )
 
 
 
-    def check(self,node):
+    def check_node(self,node):
 
         name=node["name"]
         ip=node["ip"]
@@ -129,16 +125,50 @@ class Monitor:
         while True:
 
 
+            config=self.load_config()
+
+
+            # 判断节点是否还存在
+
+            exists=False
+
+            for n in config["nodes"]:
+
+                if n["ip"]==ip:
+                    exists=True
+
+
+            if not exists:
+
+                self.log(
+                    name+" 已删除"
+                )
+
+                break
+
+
+
+            interval=config.get(
+                "interval",
+                60
+            )
+
+            worker=config.get(
+                "worker",
+                ""
+            )
+
+
+
+            # 第一次
+
             if self.ping(ip):
 
                 self.log(
                     name+" 在线"
                 )
 
-
-                time.sleep(
-                    self.interval
-                )
+                time.sleep(interval)
 
                 continue
 
@@ -152,6 +182,8 @@ class Monitor:
             time.sleep(3)
 
 
+
+            # 第二次
 
             if self.ping(ip):
 
@@ -168,6 +200,8 @@ class Monitor:
 
 
 
+            # 第三次
+
             if self.ping(ip):
 
                 continue
@@ -181,8 +215,8 @@ class Monitor:
 
             time.sleep(1)
 
-            a=self.ping(ip)
 
+            a=self.ping(ip)
 
             time.sleep(1)
 
@@ -192,17 +226,58 @@ class Monitor:
 
             if not a and not b:
 
+
                 self.log(
                     name+" 故障"
                 )
 
-                self.notify(node)
+
+                self.notify(
+                    node,
+                    worker
+                )
 
 
 
-            time.sleep(
-                self.interval
-            )
+            time.sleep(interval)
+
+
+
+    def manager(self):
+
+        while True:
+
+
+            config=self.load_config()
+
+
+            for node in config["nodes"]:
+
+
+                ip=node["ip"]
+
+
+                if ip not in self.running_nodes:
+
+
+                    self.running_nodes[ip]=True
+
+
+                    threading.Thread(
+                        target=self.check_node,
+                        args=(node,),
+                        daemon=True
+                    ).start()
+
+
+                    self.log(
+                        "启动监控:"
+                        +node["name"]
+                    )
+
+
+
+            time.sleep(10)
 
 
 
@@ -213,19 +288,7 @@ class Monitor:
         )
 
 
-        for node in self.nodes:
-
-            threading.Thread(
-                target=self.check,
-                args=(node,),
-                daemon=True
-            ).start()
-
-
-
-        while True:
-
-            time.sleep(60)
+        self.manager()
 
 
 
