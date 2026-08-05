@@ -37,7 +37,6 @@ class Monitor:
 
 
 
-    # 日志
     def log(self,msg):
 
         text=datetime.now().strftime(
@@ -45,10 +44,7 @@ class Monitor:
         )+" "+msg
 
 
-        print(
-            text,
-            flush=True
-        )
+        print(text,flush=True)
 
 
         try:
@@ -68,8 +64,6 @@ class Monitor:
             lines.append(text+"\n")
 
 
-            # 保留5000行
-
             lines=lines[-5000:]
 
 
@@ -88,8 +82,6 @@ class Monitor:
 
 
 
-
-    # 读取配置
 
     def load_config(self):
 
@@ -115,8 +107,6 @@ class Monitor:
 
 
 
-    # 保存状态
-
     def save_status(self,data):
 
         try:
@@ -126,7 +116,6 @@ class Monitor:
                 "w",
                 encoding="utf-8"
             ) as f:
-
 
                 json.dump(
                     data,
@@ -144,8 +133,6 @@ class Monitor:
 
 
 
-    # 更新状态
-
     def update_status(
             self,
             node,
@@ -155,15 +142,12 @@ class Monitor:
     ):
 
 
+        data={}
+
+
         try:
 
-
-            data={}
-
-
-            if os.path.exists(
-                STATUS_FILE
-            ):
+            if os.path.exists(STATUS_FILE):
 
                 with open(
                     STATUS_FILE,
@@ -173,50 +157,40 @@ class Monitor:
                     data=json.load(f)
 
 
-
-            data[node["ip"]]={
-
-                "name":
-                node["name"],
-
-
-                "ip":
-                node["ip"],
-
-
-                "status":
-                status,
-
-
-                "delay":
-                delay,
-
-
-                "last":
-                datetime.now().strftime(
-                    "%Y-%m-%d %H:%M:%S"
-                ),
-
-
-                "fail":
-                fail
-            }
-
-
-            self.save_status(data)
-
-
         except:
 
-            pass
+            data={}
+
+
+
+        data[node["ip"]]={
+
+            "name":node["name"],
+
+            "ip":node["ip"],
+
+            "status":status,
+
+            "delay":delay,
+
+            "fail":fail,
+
+            "last":
+            datetime.now().strftime(
+                "%Y-%m-%d %H:%M:%S"
+            )
+
+        }
+
+
+        self.save_status(data)
 
 
 
 
-    # 删除状态
+
 
     def delete_status(self,ip):
-
 
         try:
 
@@ -235,7 +209,6 @@ class Monitor:
                 data=json.load(f)
 
 
-
             if ip in data:
 
                 del data[ip]
@@ -251,12 +224,11 @@ class Monitor:
 
 
 
-    # ping
+
 
     def ping(self,ip):
 
         try:
-
 
             result=subprocess.run(
 
@@ -278,20 +250,15 @@ class Monitor:
             )
 
 
-
             if result.returncode !=0:
 
                 return False,"-"
 
 
 
-
             m=re.search(
-
                 r'time[=<]?\s*([\d.]+)',
-
                 result.stdout
-
             )
 
 
@@ -300,13 +267,11 @@ class Monitor:
                 return True,m.group(1)+"ms"
 
 
-
             return True,"-"
 
 
 
         except:
-
 
             return False,"-"
 
@@ -315,7 +280,6 @@ class Monitor:
 
 
 
-    # TG通知
 
     def notify(self,node,worker):
 
@@ -328,24 +292,17 @@ class Monitor:
 
         try:
 
-
             requests.post(
 
                 worker,
 
                 json={
 
-                    "name":
-                    node["name"],
+                    "name":node["name"],
 
+                    "ip":node["ip"],
 
-                    "ip":
-                    node["ip"],
-
-
-                    "status":
-                    "DOWN",
-
+                    "status":"DOWN",
 
                     "time":
                     datetime.now().strftime(
@@ -365,13 +322,11 @@ class Monitor:
             )
 
 
-
         except Exception as e:
 
 
             self.log(
-                "TG通知失败:"
-                +
+                "TG通知失败 "+
                 str(e)
             )
 
@@ -381,14 +336,13 @@ class Monitor:
 
 
 
-    # 单节点监控
-
     def check_node(self,node):
 
 
+        ip=node["ip"]
+
         name=node["name"]
 
-        ip=node["ip"]
 
 
         while True:
@@ -397,6 +351,8 @@ class Monitor:
             cfg=self.load_config()
 
 
+
+            # 节点被删除
 
             exists=False
 
@@ -419,6 +375,11 @@ class Monitor:
                     name+
                     " 已删除"
                 )
+
+
+                if ip in self.running_nodes:
+
+                    del self.running_nodes[ip]
 
 
                 break
@@ -448,24 +409,17 @@ class Monitor:
 
 
                 self.update_status(
-
                     node,
-
                     "在线",
-
                     delay,
-
                     0
-
                 )
 
 
                 self.log(
-
                     name+
                     " 在线 "+
                     delay
-
                 )
 
 
@@ -478,15 +432,10 @@ class Monitor:
 
 
             self.update_status(
-
                 node,
-
                 "离线",
-
                 "-",
-
                 1
-
             )
 
 
@@ -509,14 +458,11 @@ class Monitor:
 
 
 
-
-
             self.log(
-
                 name+
                 " 第二次失败"
-
             )
+
 
 
             time.sleep(5)
@@ -535,23 +481,19 @@ class Monitor:
 
 
             self.log(
-
                 name+
                 " 第三次失败确认"
-
             )
 
 
-            time.sleep(1)
+
+            time.sleep(2)
 
 
 
             a,_=self.ping(ip)
 
-
             time.sleep(1)
-
-
 
             b,_=self.ping(ip)
 
@@ -562,44 +504,31 @@ class Monitor:
             if not a and not b:
 
 
+
                 self.update_status(
-
                     node,
-
                     "离线",
-
                     "-",
-
                     3
-
                 )
 
 
                 self.log(
-
                     name+
                     " 故障停止检测"
-
                 )
-
 
 
                 self.notify(
-
                     node,
-
                     worker
-
                 )
 
 
 
-                # 清除运行状态
+                # 标记停止，不删除
 
-                if ip in self.running_nodes:
-
-                    del self.running_nodes[ip]
-
+                self.running_nodes[ip]="stopped"
 
 
                 break
@@ -610,8 +539,6 @@ class Monitor:
 
 
 
-
-    # 管理线程
 
     def manager(self):
 
@@ -633,9 +560,7 @@ class Monitor:
                 if ip not in self.running_nodes:
 
 
-
-                    self.running_nodes[ip]=True
-
+                    self.running_nodes[ip]="running"
 
 
                     threading.Thread(
@@ -651,16 +576,15 @@ class Monitor:
 
 
                     self.log(
-
                         "启动监控:"
                         +
                         node["name"]
-
                     )
 
 
 
             time.sleep(10)
+
 
 
 
