@@ -1,86 +1,320 @@
-from flask import Flask, render_template
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
+from flask import Flask, request, jsonify, render_template
 import json
 import os
-from datetime import datetime
+import subprocess
 
 
-app = Flask(__name__)
+BASE_DIR = "/opt/pingmonitor"
+CONFIG = BASE_DIR + "/config.json"
+STATUS = BASE_DIR + "/status.json"
+LOG_FILE = BASE_DIR + "/logs/monitor.log"
 
 
-STATUS_FILE = "/opt/pingmonitor/status.json"
+app = Flask(
+    __name__,
+    template_folder="templates"
+)
+
+
+
+def load_config():
+
+    if os.path.exists(CONFIG):
+
+        with open(
+            CONFIG,
+            "r",
+            encoding="utf-8"
+        ) as f:
+
+            return json.load(f)
+
+
+    return {
+        "nodes":[],
+        "worker":"",
+        "interval":60
+    }
+
+
+
+def save_config(data):
+
+    with open(
+        CONFIG,
+        "w",
+        encoding="utf-8"
+    ) as f:
+
+        json.dump(
+            data,
+            f,
+            indent=4,
+            ensure_ascii=False
+        )
 
 
 
 def load_status():
 
-    if not os.path.exists(STATUS_FILE):
-        return []
+    if os.path.exists(STATUS):
 
+        try:
 
-    try:
+            with open(
+                STATUS,
+                "r",
+                encoding="utf-8"
+            ) as f:
 
-        with open(
-            STATUS_FILE,
-            "r",
-            encoding="utf-8"
-        ) as f:
+                return json.load(f)
 
-            data = json.load(f)
+        except:
 
+            return {}
 
-        nodes = []
-
-
-        for ip, info in data.items():
-
-            nodes.append({
-
-                "name": info.get("name", ""),
-
-                "ip": info.get("ip", ip),
-
-                "status": info.get("status", "未知"),
-
-                "delay": info.get("delay", "-"),
-
-                "last": info.get("last", "-"),
-
-                "fail": info.get("fail", 0)
-
-            })
-
-
-        return nodes
-
-
-    except Exception as e:
-
-        print(e)
-
-        return []
-
+    return {}
 
 
 
 @app.route("/")
 def index():
 
-    nodes = load_status()
-
-
     return render_template(
-        "index.html",
-        nodes=nodes,
-        update_time=datetime.now().strftime(
-            "%Y-%m-%d %H:%M:%S"
-        )
+        "index.html"
     )
 
 
 
-if __name__ == "__main__":
+# 获取配置 + 状态
+
+@app.route("/api/config")
+def config():
+
+    cfg = load_config()
+
+    status = load_status()
+
+
+    for node in cfg["nodes"]:
+
+        ip = node["ip"]
+
+
+        if ip in status:
+
+            node.update(
+                status[ip]
+            )
+
+        else:
+
+            node.update(
+                {
+                    "status":"未知",
+                    "delay":"-",
+                    "fail":0,
+                    "last":"-"
+                }
+            )
+
+
+    return jsonify(cfg)
+
+
+
+# 添加节点
+
+@app.route(
+    "/api/add",
+    methods=["POST"]
+)
+def add():
+
+    data=request.json
+
+    cfg=load_config()
+
+
+    cfg["nodes"].append(
+        {
+            "name":data["name"],
+            "ip":data["ip"]
+        }
+    )
+
+
+    save_config(cfg)
+
+
+    return jsonify(
+        {
+            "ok":True
+        }
+    )
+
+
+
+# 删除节点
+
+@app.route(
+    "/api/delete",
+    methods=["POST"]
+)
+def delete():
+
+    data=request.json
+
+    cfg=load_config()
+
+
+    cfg["nodes"]=[
+        n for n in cfg["nodes"]
+        if n["ip"] != data["ip"]
+    ]
+
+
+    save_config(cfg)
+
+
+    return jsonify(
+        {
+            "ok":True
+        }
+    )
+
+
+
+# Worker
+
+@app.route(
+    "/api/worker",
+    methods=["POST"]
+)
+def worker():
+
+    data=request.json
+
+    cfg=load_config()
+
+
+    cfg["worker"]=data["worker"]
+
+
+    save_config(cfg)
+
+
+    return jsonify(
+        {
+            "ok":True
+        }
+    )
+
+
+
+# 间隔
+
+@app.route(
+    "/api/interval",
+    methods=["POST"]
+)
+def interval():
+
+    data=request.json
+
+    cfg=load_config()
+
+
+    cfg["interval"]=int(
+        data["interval"]
+    )
+
+
+    save_config(cfg)
+
+
+    return jsonify(
+        {
+            "ok":True
+        }
+    )
+
+
+
+# 日志
+
+@app.route("/api/logs")
+def logs():
+
+    try:
+
+        with open(
+            LOG_FILE,
+            "r",
+            encoding="utf-8"
+        ) as f:
+
+            lines=f.readlines()
+
+
+        return jsonify(
+            lines[-100:]
+        )
+
+
+    except:
+
+        return jsonify([])
+
+
+
+# 服务控制
+
+@app.route(
+    "/api/service/<action>"
+)
+def service(action):
+
+    allow=[
+        "start",
+        "stop",
+        "restart"
+    ]
+
+
+    if action not in allow:
+
+        return jsonify(
+            {
+                "ok":False
+            }
+        )
+
+
+    subprocess.run(
+        [
+            "sudo",
+            "systemctl",
+            action,
+            "pingmonitor"
+        ]
+    )
+
+
+    return jsonify(
+        {
+            "ok":True
+        }
+    )
+
+
+
+if __name__=="__main__":
 
     app.run(
         host="0.0.0.0",
-        port=8080
+        port=5000
     )
