@@ -6,27 +6,62 @@ import time
 import subprocess
 import threading
 import requests
+import os
 from datetime import datetime
 
 
 BASE_DIR = "/opt/pingmonitor"
 CONFIG = BASE_DIR + "/config.json"
+LOG_DIR = BASE_DIR + "/logs"
+LOG_FILE = LOG_DIR + "/monitor.log"
 
 
 class Monitor:
+
 
     def __init__(self):
 
         self.running_nodes = {}
 
+        os.makedirs(
+            LOG_DIR,
+            exist_ok=True
+        )
 
-    def log(self, msg):
+
+    def log(self,msg):
+
+        text = (
+            datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            +
+            " "
+            +
+            msg
+        )
+
 
         print(
-            datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            msg,
+            text,
             flush=True
         )
+
+
+        try:
+
+            with open(
+                LOG_FILE,
+                "a",
+                encoding="utf-8"
+            ) as f:
+
+                f.write(
+                    text+"\n"
+                )
+
+        except:
+
+            pass
+
 
 
     def load_config(self):
@@ -41,21 +76,23 @@ class Monitor:
 
                 return json.load(f)
 
+
         except:
 
+
             return {
-                "nodes": [],
-                "worker": "",
-                "interval": 60
+                "nodes":[],
+                "worker":"",
+                "interval":60
             }
 
 
 
-    def ping(self, ip):
+    def ping(self,ip):
 
         try:
 
-            result = subprocess.run(
+            result=subprocess.run(
                 [
                     "ping",
                     "-c",
@@ -68,6 +105,7 @@ class Monitor:
                 stderr=subprocess.DEVNULL
             )
 
+
             return result.returncode == 0
 
 
@@ -77,38 +115,32 @@ class Monitor:
 
 
 
-    def notify(self, node, worker):
+    def notify(self,node,worker):
 
         if not worker:
 
             self.log(
-                "未配置TG Worker"
+                node["name"]
+                +
+                " 未配置TG"
             )
 
             return
-
-
-        data = {
-
-            "name": node["name"],
-
-            "ip": node["ip"],
-
-            "status": "DOWN",
-
-            "time":
-            datetime.now().strftime(
-                "%Y-%m-%d %H:%M:%S"
-            )
-
-        }
 
 
         try:
 
             requests.post(
                 worker,
-                json=data,
+                json={
+                    "name":node["name"],
+                    "ip":node["ip"],
+                    "status":"DOWN",
+                    "time":
+                    datetime.now().strftime(
+                        "%Y-%m-%d %H:%M:%S"
+                    )
+                },
                 timeout=10
             )
 
@@ -124,7 +156,7 @@ class Monitor:
 
 
             self.log(
-                "TG通知失败:"
+                "TG通知失败 "
                 +
                 str(e)
             )
@@ -133,20 +165,20 @@ class Monitor:
 
     def check_node(self,node):
 
-        name = node["name"]
 
-        ip = node["ip"]
+        name=node["name"]
+
+        ip=node["ip"]
+
 
 
         while True:
 
 
-            config = self.load_config()
+            config=self.load_config()
 
 
-            # 判断节点是否还存在
-
-            exists = False
+            exists=False
 
 
             for n in config.get(
@@ -154,9 +186,9 @@ class Monitor:
                 []
             ):
 
-                if n["ip"] == ip:
+                if n["ip"]==ip:
 
-                    exists = True
+                    exists=True
 
 
 
@@ -173,20 +205,18 @@ class Monitor:
 
 
 
-            interval = config.get(
+            interval=config.get(
                 "interval",
                 60
             )
 
 
-            worker = config.get(
+            worker=config.get(
                 "worker",
                 ""
             )
 
 
-
-            # 正常
 
             if self.ping(ip):
 
@@ -203,8 +233,6 @@ class Monitor:
                 continue
 
 
-
-            # 第一次失败
 
             self.log(
                 name
@@ -223,8 +251,6 @@ class Monitor:
 
 
 
-            # 第二次失败
-
             self.log(
                 name
                 +
@@ -242,8 +268,6 @@ class Monitor:
 
 
 
-            # 第三次失败
-
             self.log(
                 name
                 +
@@ -254,14 +278,11 @@ class Monitor:
             time.sleep(1)
 
 
-
-            a = self.ping(ip)
-
+            a=self.ping(ip)
 
             time.sleep(1)
 
-
-            b = self.ping(ip)
+            b=self.ping(ip)
 
 
 
@@ -281,23 +302,7 @@ class Monitor:
                 )
 
 
-                # 通知完成后退出
-
                 break
-
-
-
-            else:
-
-
-                self.log(
-                    name
-                    +
-                    " 恢复"
-                )
-
-                continue
-
 
 
 
@@ -307,7 +312,7 @@ class Monitor:
         while True:
 
 
-            config = self.load_config()
+            config=self.load_config()
 
 
 
@@ -317,35 +322,27 @@ class Monitor:
             ):
 
 
-                ip = node["ip"]
-
+                ip=node["ip"]
 
 
                 if ip not in self.running_nodes:
 
 
-                    self.running_nodes[ip] = True
-
+                    self.running_nodes[ip]=True
 
 
                     threading.Thread(
-
                         target=self.check_node,
-
                         args=(node,),
-
                         daemon=True
-
                     ).start()
 
 
 
                     self.log(
-
                         "启动监控:"
                         +
                         node["name"]
-
                     )
 
 
@@ -356,7 +353,6 @@ class Monitor:
 
     def start(self):
 
-
         self.log(
             "PingMonitor启动"
         )
@@ -366,7 +362,7 @@ class Monitor:
 
 
 
-if __name__ == "__main__":
+if __name__=="__main__":
 
 
     Monitor().start()
