@@ -7,13 +7,20 @@ import subprocess
 import threading
 import requests
 import os
+import re
 from datetime import datetime
 
 
-BASE_DIR = "/opt/pingmonitor"
-CONFIG = BASE_DIR + "/config.json"
-LOG_DIR = BASE_DIR + "/logs"
-LOG_FILE = LOG_DIR + "/monitor.log"
+BASE_DIR="/opt/pingmonitor"
+
+CONFIG=BASE_DIR+"/config.json"
+
+LOG_DIR=BASE_DIR+"/logs"
+
+LOG_FILE=LOG_DIR+"/monitor.log"
+
+STATUS_FILE=BASE_DIR+"/status.json"
+
 
 
 class Monitor:
@@ -21,7 +28,7 @@ class Monitor:
 
     def __init__(self):
 
-        self.running_nodes = {}
+        self.running_nodes={}
 
         os.makedirs(
             LOG_DIR,
@@ -29,15 +36,12 @@ class Monitor:
         )
 
 
+
     def log(self,msg):
 
-        text = (
-            datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            +
-            " "
-            +
-            msg
-        )
+        text=datetime.now().strftime(
+            "%Y-%m-%d %H:%M:%S"
+        )+" "+msg
 
 
         print(
@@ -46,21 +50,15 @@ class Monitor:
         )
 
 
-        try:
+        with open(
+            LOG_FILE,
+            "a",
+            encoding="utf-8"
+        ) as f:
 
-            with open(
-                LOG_FILE,
-                "a",
-                encoding="utf-8"
-            ) as f:
-
-                f.write(
-                    text+"\n"
-                )
-
-        except:
-
-            pass
+            f.write(
+                text+"\n"
+            )
 
 
 
@@ -70,21 +68,93 @@ class Monitor:
 
             with open(
                 CONFIG,
-                "r",
                 encoding="utf-8"
             ) as f:
 
                 return json.load(f)
 
-
         except:
-
 
             return {
                 "nodes":[],
                 "worker":"",
                 "interval":60
             }
+
+
+
+    def save_status(self,data):
+
+        try:
+
+            with open(
+                STATUS_FILE,
+                "w",
+                encoding="utf-8"
+            ) as f:
+
+                json.dump(
+                    data,
+                    f,
+                    indent=4,
+                    ensure_ascii=False
+                )
+
+        except:
+
+            pass
+
+
+
+    def update_status(
+        self,
+        node,
+        status,
+        delay="-",
+        fail=0
+    ):
+
+
+        try:
+
+            if os.path.exists(
+                STATUS_FILE
+            ):
+
+                with open(
+                    STATUS_FILE,
+                    encoding="utf-8"
+                ) as f:
+
+                    data=json.load(f)
+
+            else:
+
+                data={}
+
+
+
+            data[node["ip"]]={
+                "name":node["name"],
+                "ip":node["ip"],
+                "status":status,
+                "delay":delay,
+                "last":
+                datetime.now().strftime(
+                    "%Y-%m-%d %H:%M:%S"
+                ),
+                "fail":fail
+            }
+
+
+
+            self.save_status(data)
+
+
+        except:
+
+            pass
+
 
 
 
@@ -101,29 +171,42 @@ class Monitor:
                     "3",
                     ip
                 ],
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL
+                stdout=subprocess.PIPE,
+                stderr=subprocess.DEVNULL,
+                text=True
             )
 
 
-            return result.returncode == 0
+            if result.returncode !=0:
+
+                return False,"-"
+
+
+
+            m=re.search(
+                r'time[=<]([\d.]+)',
+                result.stdout
+            )
+
+
+            if m:
+
+                return True,m.group(1)+"ms"
+
+
+            return True,"-"
 
 
         except:
 
-            return False
+            return False,"-"
+
 
 
 
     def notify(self,node,worker):
 
         if not worker:
-
-            self.log(
-                node["name"]
-                +
-                " 未配置TG"
-            )
 
             return
 
@@ -146,20 +229,18 @@ class Monitor:
 
 
             self.log(
-                node["name"]
-                +
+                node["name"]+
                 " TG通知成功"
             )
 
 
         except Exception as e:
 
-
             self.log(
-                "TG通知失败 "
-                +
+                "TG通知失败 "+
                 str(e)
             )
+
 
 
 
@@ -170,21 +251,20 @@ class Monitor:
 
         ip=node["ip"]
 
+        fail_count=0
+
 
 
         while True:
 
 
-            config=self.load_config()
+            cfg=self.load_config()
 
 
             exists=False
 
 
-            for n in config.get(
-                "nodes",
-                []
-            ):
+            for n in cfg["nodes"]:
 
                 if n["ip"]==ip:
 
@@ -194,10 +274,8 @@ class Monitor:
 
             if not exists:
 
-
                 self.log(
-                    name
-                    +
+                    name+
                     " 已删除"
                 )
 
@@ -205,26 +283,41 @@ class Monitor:
 
 
 
-            interval=config.get(
-                "interval",
-                60
-            )
-
-
-            worker=config.get(
+            worker=cfg.get(
                 "worker",
                 ""
             )
 
 
+            interval=cfg.get(
+                "interval",
+                60
+            )
 
-            if self.ping(ip):
+
+
+            ok,delay=self.ping(ip)
+
+
+
+            if ok:
+
+
+                fail_count=0
+
+
+                self.update_status(
+                    node,
+                    "在线",
+                    delay,
+                    0
+                )
 
 
                 self.log(
-                    name
-                    +
-                    " 在线"
+                    name+
+                    " 在线 "+
+                    delay
                 )
 
 
@@ -234,9 +327,19 @@ class Monitor:
 
 
 
+            fail_count+=1
+
+
+            self.update_status(
+                node,
+                "离线",
+                "-",
+                fail_count
+            )
+
+
             self.log(
-                name
-                +
+                name+
                 " 第一次失败"
             )
 
@@ -245,15 +348,16 @@ class Monitor:
 
 
 
-            if self.ping(ip):
+            ok,_=self.ping(ip)
+
+            if ok:
 
                 continue
 
 
 
             self.log(
-                name
-                +
+                name+
                 " 第二次失败"
             )
 
@@ -262,15 +366,16 @@ class Monitor:
 
 
 
-            if self.ping(ip):
+            ok,_=self.ping(ip)
+
+            if ok:
 
                 continue
 
 
 
             self.log(
-                name
-                +
+                name+
                 " 第三次失败确认"
             )
 
@@ -278,20 +383,27 @@ class Monitor:
             time.sleep(1)
 
 
-            a=self.ping(ip)
+            a,_=self.ping(ip)
 
             time.sleep(1)
 
-            b=self.ping(ip)
+            b,_=self.ping(ip)
 
 
 
             if not a and not b:
 
 
+                self.update_status(
+                    node,
+                    "离线",
+                    "-",
+                    3
+                )
+
+
                 self.log(
-                    name
-                    +
+                    name+
                     " 故障停止检测"
                 )
 
@@ -306,20 +418,19 @@ class Monitor:
 
 
 
+
+
     def manager(self):
 
 
         while True:
 
 
-            config=self.load_config()
+            cfg=self.load_config()
 
 
 
-            for node in config.get(
-                "nodes",
-                []
-            ):
+            for node in cfg["nodes"]:
 
 
                 ip=node["ip"]
@@ -351,18 +462,18 @@ class Monitor:
 
 
 
+
     def start(self):
 
         self.log(
             "PingMonitor启动"
         )
 
-
         self.manager()
 
 
 
-if __name__=="__main__":
 
+if __name__=="__main__":
 
     Monitor().start()
