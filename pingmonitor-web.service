@@ -1,0 +1,19 @@
+[Unit]
+Description=PingMonitor Web Panel
+After=network.target
+
+
+[Service]
+
+WorkingDirectory=/opt/pingmonitor
+
+ExecStart=/usr/bin/python3 /opt/pingmonitor/web.py
+
+Restart=always
+
+RestartSec=5
+
+
+[Install]
+
+WantedBy=multi-user.target
