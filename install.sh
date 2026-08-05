@@ -11,28 +11,18 @@ echo " PingMonitor 安装开始"
 echo "=============================="
 
 
-# 更新系统
-
 apt update -y
 
-
-
-# 安装基础环境
 
 apt install -y \
 python3 \
 python3-pip \
-iputils-ping
+iputils-ping \
+sudo
 
 
 
-# 创建目录
-
-mkdir -p $APP_DIR/templates
-
-
-
-echo "安装 Python 依赖"
+echo "安装Python依赖"
 
 
 pip3 install flask requests
@@ -41,10 +31,15 @@ pip3 install flask requests
 
 
 
-echo "复制程序文件"
+echo "创建目录"
 
 
-# 当前目录复制到安装目录
+mkdir -p $APP_DIR/templates
+
+
+
+echo "复制文件"
+
 
 cp monitor.py $APP_DIR/
 
@@ -52,11 +47,49 @@ cp web.py $APP_DIR/
 
 cp config.json $APP_DIR/
 
-cp pingmonitor.service /etc/systemd/system/
-
-cp pingmonitor-web.service /etc/systemd/system/
-
 cp templates/index.html $APP_DIR/templates/
+
+
+
+cp pingmonitor.service \
+/etc/systemd/system/
+
+
+cp pingmonitor-web.service \
+/etc/systemd/system/
+
+
+
+
+
+echo "配置sudo权限"
+
+
+mkdir -p /etc/sudoers.d
+
+
+cat > /etc/sudoers.d/pingmonitor <<EOF
+
+www-data ALL=(ALL) NOPASSWD: /bin/systemctl start pingmonitor
+
+www-data ALL=(ALL) NOPASSWD: /bin/systemctl stop pingmonitor
+
+www-data ALL=(ALL) NOPASSWD: /bin/systemctl restart pingmonitor
+
+EOF
+
+
+
+chmod 440 /etc/sudoers.d/pingmonitor
+
+
+
+
+
+echo "设置文件权限"
+
+
+chown -R www-data:www-data $APP_DIR
 
 
 
@@ -82,16 +115,22 @@ systemctl restart pingmonitor-web
 
 
 
-SERVER_IP=$(hostname -I | awk '{print $1}')
+IP=$(hostname -I | awk '{print $1}')
 
 
 
 echo ""
+
 echo "=============================="
-echo " 安装完成"
+
+echo "安装完成"
+
 echo ""
-echo "管理地址:"
+
+echo "Web管理地址:"
+
+echo "http://${IP}:5000"
+
 echo ""
-echo "http://${SERVER_IP}:5000"
-echo ""
+
 echo "=============================="
