@@ -3,9 +3,12 @@ import json
 import os
 from datetime import datetime
 
+
 app = Flask(__name__)
 
-STATUS_FILE = "status.json"
+
+STATUS_FILE = "/opt/pingmonitor/status.json"
+
 
 
 def load_status():
@@ -13,7 +16,9 @@ def load_status():
     if not os.path.exists(STATUS_FILE):
         return []
 
+
     try:
+
         with open(
             STATUS_FILE,
             "r",
@@ -22,11 +27,38 @@ def load_status():
 
             data = json.load(f)
 
-            return data.get("nodes", [])
 
-    except Exception:
+        nodes = []
+
+
+        for ip, info in data.items():
+
+            nodes.append({
+
+                "name": info.get("name", ""),
+
+                "ip": info.get("ip", ip),
+
+                "status": info.get("status", "未知"),
+
+                "delay": info.get("delay", "-"),
+
+                "last": info.get("last", "-"),
+
+                "fail": info.get("fail", 0)
+
+            })
+
+
+        return nodes
+
+
+    except Exception as e:
+
+        print(e)
 
         return []
+
 
 
 
@@ -34,6 +66,7 @@ def load_status():
 def index():
 
     nodes = load_status()
+
 
     return render_template(
         "index.html",
