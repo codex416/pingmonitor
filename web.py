@@ -16,7 +16,6 @@ LOG_FILE = BASE_DIR + "/logs/monitor.log"
 STATUS_FILE = BASE_DIR + "/status.json"
 
 
-
 app = Flask(
     __name__,
     template_folder="templates"
@@ -25,23 +24,16 @@ app = Flask(
 
 
 # =====================
-# 配置读取
+# 配置
 # =====================
 
 def load_config():
 
     try:
-
-        with open(
-            CONFIG,
-            "r",
-            encoding="utf-8"
-        ) as f:
-
+        with open(CONFIG,"r",encoding="utf-8") as f:
             return json.load(f)
 
     except:
-
 
         return {
             "nodes":[],
@@ -51,14 +43,7 @@ def load_config():
 
 
 
-
 def save_config(data):
-
-    os.makedirs(
-        BASE_DIR,
-        exist_ok=True
-    )
-
 
     with open(
         CONFIG,
@@ -66,14 +51,12 @@ def save_config(data):
         encoding="utf-8"
     ) as f:
 
-
         json.dump(
             data,
             f,
             indent=4,
             ensure_ascii=False
         )
-
 
 
 
@@ -90,8 +73,6 @@ def index():
 
 
 
-
-
 # =====================
 # 获取配置
 # =====================
@@ -105,8 +86,6 @@ def api_config():
 
 
 
-
-
 # =====================
 # 添加节点
 # =====================
@@ -117,23 +96,44 @@ def api_config():
 )
 def add_node():
 
-
     data=request.json
 
-
     cfg=load_config()
+
+    ip=data.get("ip")
+
+    name=data.get(
+        "name",
+        ip
+    )
+
+
+    if not ip:
+
+        return jsonify(
+            {
+                "ok":False,
+                "msg":"IP不能为空"
+            }
+        )
+
+
+    for n in cfg["nodes"]:
+
+        if n["ip"]==ip:
+
+            return jsonify(
+                {
+                    "ok":False,
+                    "msg":"节点已存在"
+                }
+            )
 
 
     cfg["nodes"].append(
         {
-            "name":
-            data.get(
-                "name",
-                data.get("ip")
-            ),
-
-            "ip":
-            data["ip"]
+            "name":name,
+            "ip":ip
         }
     )
 
@@ -146,9 +146,6 @@ def add_node():
             "ok":True
         }
     )
-
-
-
 
 
 
@@ -165,18 +162,34 @@ def delete_node():
 
     data=request.json
 
+    ip=data.get("ip")
+
+
+    if not ip:
+
+        return jsonify(
+            {
+                "ok":False,
+                "msg":"IP为空"
+            }
+        )
+
+
+    # 删除配置
 
     cfg=load_config()
 
 
-    ip=data["ip"]
+    before=len(
+        cfg["nodes"]
+    )
 
 
     cfg["nodes"]=[
 
         n for n in cfg["nodes"]
 
-        if n["ip"] != ip
+        if n["ip"]!=ip
 
     ]
 
@@ -185,14 +198,56 @@ def delete_node():
 
 
 
+    # 删除状态
+
+    try:
+
+        if os.path.exists(
+            STATUS_FILE
+        ):
+
+            with open(
+                STATUS_FILE,
+                encoding="utf-8"
+            ) as f:
+
+                status=json.load(f)
+
+
+            if ip in status:
+
+                del status[ip]
+
+
+            with open(
+                STATUS_FILE,
+                "w",
+                encoding="utf-8"
+            ) as f:
+
+                json.dump(
+                    status,
+                    f,
+                    indent=4,
+                    ensure_ascii=False
+                )
+
+    except Exception as e:
+
+        print(
+            "status删除错误:",
+            e
+        )
+
+
+
     return jsonify(
         {
-            "ok":True
+            "ok":True,
+            "deleted":
+            before-len(cfg["nodes"])
         }
     )
-
-
-
 
 
 
@@ -206,14 +261,12 @@ def delete_node():
 )
 def worker():
 
-
     data=request.json
-
 
     cfg=load_config()
 
 
-    cfg["worker"] = data.get(
+    cfg["worker"]=data.get(
         "worker",
         ""
     )
@@ -222,16 +275,11 @@ def worker():
     save_config(cfg)
 
 
-
     return jsonify(
         {
             "ok":True
         }
     )
-
-
-
-
 
 
 
@@ -249,13 +297,23 @@ def interval():
     data=request.json
 
 
+    value=int(
+        data.get(
+            "interval",
+            60
+        )
+    )
+
+
+    if value < 5:
+
+        value=5
+
+
     cfg=load_config()
 
 
-
-    cfg["interval"] = int(
-        data["interval"]
-    )
+    cfg["interval"]=value
 
 
     save_config(cfg)
@@ -265,79 +323,81 @@ def interval():
     return jsonify(
         {
             "ok":True,
-            "interval":
-            cfg["interval"]
+            "interval":value
         }
     )
 
 
 
-
-
-
 # =====================
-# 节点状态
+# 状态
 # =====================
 
-@app.route(
-    "/api/status"
-)
+@app.route("/api/status")
 def status():
 
 
     try:
 
-
         with open(
             STATUS_FILE,
-            "r",
             encoding="utf-8"
         ) as f:
 
+            status=json.load(f)
 
-            data=json.load(f)
 
+
+        cfg=load_config()
+
+
+        ips=[
+
+            n["ip"]
+
+            for n in cfg["nodes"]
+
+        ]
+
+
+        result=[]
+
+
+        for ip in ips:
+
+            if ip in status:
+
+                result.append(
+                    status[ip]
+                )
 
 
         return jsonify(
-            list(
-                data.values()
-            )
+            result
         )
 
 
     except:
 
-
         return jsonify([])
 
 
 
-
-
-
 # =====================
-# 实时日志
+# 日志
 # =====================
 
-@app.route(
-    "/api/logs"
-)
+@app.route("/api/logs")
 def logs():
-
 
     try:
 
-
         with open(
             LOG_FILE,
-            "r",
             encoding="utf-8"
         ) as f:
 
-
             lines=f.readlines()
-
 
 
         return jsonify(
@@ -347,12 +407,7 @@ def logs():
 
     except:
 
-
         return jsonify([])
-
-
-
-
 
 
 
@@ -366,17 +421,11 @@ def logs():
 def service(action):
 
 
-    allow=[
-
+    if action not in [
         "start",
         "stop",
         "restart"
-
-    ]
-
-
-    if action not in allow:
-
+    ]:
 
         return jsonify(
             {
@@ -385,28 +434,35 @@ def service(action):
         )
 
 
+    try:
 
-    subprocess.run(
-
-        [
-            "sudo",
-            "systemctl",
-            action,
-            "pingmonitor"
-        ]
-
-    )
-
-
-
-    return jsonify(
-        {
-            "ok":True
-        }
-    )
+        subprocess.run(
+            [
+                "sudo",
+                "systemctl",
+                action,
+                "pingmonitor"
+            ],
+            timeout=10
+        )
 
 
+        return jsonify(
+            {
+                "ok":True
+            }
+        )
 
+
+    except Exception as e:
+
+
+        return jsonify(
+            {
+                "ok":False,
+                "error":str(e)
+            }
+        )
 
 
 
@@ -414,9 +470,6 @@ if __name__=="__main__":
 
 
     app.run(
-
         host="0.0.0.0",
-
         port=5000
-
     )
