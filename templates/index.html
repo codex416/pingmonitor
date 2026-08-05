@@ -18,61 +18,53 @@ body{
 
 
 .box{
-
     background:white;
     padding:20px;
     margin-bottom:20px;
     border-radius:10px;
-
 }
 
 
 table{
-
     width:100%;
     border-collapse:collapse;
-
 }
 
 
 th,td{
-
     padding:10px;
     border-bottom:1px solid #ddd;
     text-align:center;
-
 }
 
 
 .online{
-
     color:green;
     font-weight:bold;
-
 }
 
 
 .offline{
-
     color:red;
     font-weight:bold;
+}
 
+
+.checking{
+    color:#888;
+    font-weight:bold;
 }
 
 
 input{
-
     padding:8px;
     margin:5px;
-
 }
 
 
 button{
-
     padding:8px 15px;
     cursor:pointer;
-
 }
 
 
@@ -86,7 +78,6 @@ button{
     font-family:monospace;
 
 }
-
 
 </style>
 
@@ -115,17 +106,11 @@ button{
 <tr>
 
 <th>名称</th>
-
 <th>IP</th>
-
 <th>状态</th>
-
 <th>延迟</th>
-
 <th>最后检测</th>
-
 <th>失败次数</th>
-
 <th>操作</th>
 
 </tr>
@@ -135,7 +120,6 @@ button{
 
 
 <tbody id="nodes">
-
 
 </tbody>
 
@@ -153,11 +137,8 @@ button{
 
 
 <button onclick="addNode()">
-
 添加
-
 </button>
-
 
 
 </div>
@@ -167,19 +148,15 @@ button{
 
 
 <div class="box">
-
 
 <h3>Telegram Worker</h3>
 
 
-<input id="worker"
-style="width:400px">
+<input id="worker" style="width:400px">
 
 
 <button onclick="saveWorker()">
-
 保存
-
 </button>
 
 
@@ -191,25 +168,22 @@ style="width:400px">
 
 <div class="box">
 
-
 <h3>检测间隔</h3>
 
 
-<input id="interval"
-type="number">
+<input id="interval" type="number">
 
 
 秒
 
 
 <button onclick="saveInterval()">
-
 保存
-
 </button>
 
 
 </div>
+
 
 
 
@@ -222,23 +196,17 @@ type="number">
 
 
 <button onclick="service('start')">
-
 启动
-
 </button>
 
 
 <button onclick="service('stop')">
-
 停止
-
 </button>
 
 
 <button onclick="service('restart')">
-
 重启
-
 </button>
 
 
@@ -268,16 +236,16 @@ type="number">
 
 
 
+
 <script>
+
 
 
 async function loadConfig(){
 
 
 let r =
-await fetch(
-"/api/config"
-);
+await fetch("/api/config");
 
 
 let c =
@@ -285,34 +253,95 @@ await r.json();
 
 
 
-document.getElementById(
-"worker"
-).value =
+document.getElementById("worker").value =
 c.worker || "";
 
 
 
-document.getElementById(
-"interval"
-).value =
+document.getElementById("interval").value =
 c.interval || 60;
+
+
+
+return c;
 
 
 }
 
 
 
+
+
+
 async function loadStatus(){
 
 
+
+let config =
+await loadConfig();
+
+
+
 let r =
-await fetch(
-"/api/status"
-);
+await fetch("/api/status");
 
 
-let data =
+let status =
 await r.json();
+
+
+
+let map={};
+
+
+
+status.forEach(n=>{
+
+map[n.ip]=n;
+
+});
+
+
+
+let data=[];
+
+
+
+config.nodes.forEach(n=>{
+
+
+if(map[n.ip]){
+
+
+data.push(map[n.ip]);
+
+
+}else{
+
+
+data.push({
+
+name:n.name,
+
+ip:n.ip,
+
+status:"检测中",
+
+delay:"-",
+
+last:"-",
+
+fail:0
+
+
+});
+
+
+}
+
+
+});
+
 
 
 
@@ -323,12 +352,22 @@ let html="";
 data.forEach(n=>{
 
 
-let cls =
-n.status=="在线"
-?
-"online"
-:
-"offline";
+
+let cls="checking";
+
+
+if(n.status=="在线"){
+
+cls="online";
+
+}
+
+
+if(n.status=="离线"){
+
+cls="offline";
+
+}
 
 
 
@@ -391,13 +430,12 @@ ${n.fail}
 `;
 
 
+
 });
 
 
 
-document.getElementById(
-"nodes"
-).innerHTML =
+document.getElementById("nodes").innerHTML =
 html;
 
 
@@ -406,39 +444,57 @@ html;
 
 
 
+
+
+
 async function addNode(){
 
 
-await fetch(
-"/api/add",
-{
+let name =
+document.getElementById("name").value;
+
+
+let ip =
+document.getElementById("ip").value;
+
+
+
+if(!ip){
+
+alert("请输入IP");
+
+return;
+
+}
+
+
+
+await fetch("/api/add",{
 
 method:"POST",
 
 headers:{
-"Content-Type":"application/json"
-},
 
+"Content-Type":"application/json"
+
+},
 
 body:JSON.stringify({
 
-name:
-document.getElementById(
-"name"
-).value,
+name:name,
 
-
-ip:
-document.getElementById(
-"ip"
-).value
-
+ip:ip
 
 })
 
 
-}
-);
+});
+
+
+
+document.getElementById("name").value="";
+
+document.getElementById("ip").value="";
 
 
 
@@ -450,19 +506,22 @@ loadStatus();
 
 
 
+
+
+
+
 async function delNode(ip){
 
 
-await fetch(
-"/api/delete",
-{
+await fetch("/api/delete",{
 
 method:"POST",
 
 headers:{
-"Content-Type":"application/json"
-},
 
+"Content-Type":"application/json"
+
+},
 
 body:JSON.stringify({
 
@@ -471,15 +530,18 @@ ip:ip
 })
 
 
+});
+
+
+
+setTimeout(loadStatus,500);
+
+
 }
-);
 
 
 
-loadStatus();
 
-
-}
 
 
 
@@ -488,38 +550,34 @@ loadStatus();
 async function saveWorker(){
 
 
-await fetch(
-"/api/worker",
-{
+await fetch("/api/worker",{
 
 method:"POST",
 
 headers:{
-"Content-Type":"application/json"
-},
 
+"Content-Type":"application/json"
+
+},
 
 body:JSON.stringify({
 
 worker:
-document.getElementById(
-"worker"
-).value
+document.getElementById("worker").value
 
 })
 
 
-}
-);
+});
 
 
 
-alert(
-"保存成功"
-);
+alert("保存成功");
 
 
 }
+
+
 
 
 
@@ -530,38 +588,35 @@ alert(
 async function saveInterval(){
 
 
-await fetch(
-"/api/interval",
-{
+await fetch("/api/interval",{
 
 method:"POST",
 
 headers:{
-"Content-Type":"application/json"
-},
 
+"Content-Type":"application/json"
+
+},
 
 body:JSON.stringify({
 
 interval:
-document.getElementById(
-"interval"
-).value
+document.getElementById("interval").value
 
 })
 
 
-}
-);
+});
 
 
 
-alert(
-"检测间隔已修改"
-);
+alert("检测间隔已修改");
 
 
 }
+
+
+
 
 
 
@@ -571,12 +626,17 @@ alert(
 async function service(a){
 
 
-await fetch(
-"/api/service/"+a
-);
+await fetch("/api/service/"+a);
+
+
+alert("执行完成");
 
 
 }
+
+
+
+
 
 
 
@@ -586,9 +646,7 @@ async function loadLogs(){
 
 
 let r =
-await fetch(
-"/api/logs"
-);
+await fetch("/api/logs");
 
 
 let data =
@@ -597,22 +655,17 @@ await r.json();
 
 
 let box =
-document.getElementById(
-"logs"
-);
+document.getElementById("logs");
 
 
 
 box.innerHTML =
-data.join(
-"<br>"
-);
+data.join("<br>");
 
 
 
 box.scrollTop =
 box.scrollHeight;
-
 
 
 }
@@ -621,7 +674,7 @@ box.scrollHeight;
 
 
 
-loadConfig();
+
 
 loadStatus();
 
@@ -629,17 +682,10 @@ loadLogs();
 
 
 
-setInterval(
-loadStatus,
-5000
-);
+setInterval(loadStatus,5000);
 
 
-
-setInterval(
-loadLogs,
-5000
-);
+setInterval(loadLogs,5000);
 
 
 
