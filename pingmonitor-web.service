@@ -5,6 +5,8 @@ After=network.target
 
 [Service]
 
+User=www-data
+
 WorkingDirectory=/opt/pingmonitor
 
 ExecStart=/usr/bin/python3 /opt/pingmonitor/web.py
