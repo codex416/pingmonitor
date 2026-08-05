@@ -25,15 +25,14 @@ def load_config():
         }
 
 
-    with open(CONFIG,"r",encoding="utf-8") as f:
-
+    with open(CONFIG, "r", encoding="utf-8") as f:
         return json.load(f)
 
 
 
 def save_config(data):
 
-    with open(CONFIG,"w",encoding="utf-8") as f:
+    with open(CONFIG, "w", encoding="utf-8") as f:
 
         json.dump(
             data,
@@ -48,7 +47,7 @@ def ping(ip):
 
     try:
 
-        result=subprocess.run(
+        result = subprocess.run(
             [
                 "ping",
                 "-c",
@@ -61,7 +60,8 @@ def ping(ip):
             stderr=subprocess.DEVNULL
         )
 
-        return result.returncode==0
+        return result.returncode == 0
+
 
     except:
 
@@ -72,18 +72,18 @@ def ping(ip):
 @app.route("/")
 def index():
 
-    config=load_config()
+    config = load_config()
 
-    nodes=[]
+    nodes = []
 
 
-    for n in config["nodes"]:
+    for n in config.get("nodes", []):
 
         nodes.append({
 
-            "name":n["name"],
+            "name": n["name"],
 
-            "ip":n["ip"],
+            "ip": n["ip"],
 
             "status":
                 "在线"
@@ -97,31 +97,31 @@ def index():
     return render_template(
         "index.html",
         nodes=nodes,
-        worker=config.get("worker","")
+        worker=config.get("worker", "")
     )
 
 
 
-# 添加IP
+# 添加节点
 
-@app.route("/add",methods=["POST"])
+@app.route("/add", methods=["POST"])
 def add():
 
-    config=load_config()
+    config = load_config()
 
 
-    name=request.form.get("name")
+    name = request.form.get("name")
 
-    ip=request.form.get("ip")
+    ip = request.form.get("ip")
 
 
     if ip:
 
         config["nodes"].append({
 
-            "name":name or ip,
+            "name": name or ip,
 
-            "ip":ip
+            "ip": ip
 
         })
 
@@ -133,12 +133,12 @@ def add():
 
 
 
-# 删除IP
+# 删除节点
 
 @app.route("/delete/<int:id>")
 def delete(id):
 
-    config=load_config()
+    config = load_config()
 
 
     if id < len(config["nodes"]):
@@ -152,12 +152,12 @@ def delete(id):
 
 
 
-# 保存worker
+# 设置Worker
 
-@app.route("/worker",methods=["POST"])
+@app.route("/worker", methods=["POST"])
 def worker():
 
-    config=load_config()
+    config = load_config()
 
 
     config["worker"] = request.form.get(
@@ -173,23 +173,33 @@ def worker():
 
 
 
-# 服务控制
+# systemctl控制
 
 @app.route("/service/<cmd>")
 def service(cmd):
 
-    if cmd in [
+    allow = [
         "start",
         "stop",
         "restart"
-    ]:
+    ]
+
+
+    if cmd in allow:
 
         subprocess.run(
+
             [
+                "sudo",
                 "systemctl",
                 cmd,
                 "pingmonitor"
-            ]
+            ],
+
+            stdout=subprocess.DEVNULL,
+
+            stderr=subprocess.DEVNULL
+
         )
 
 
@@ -197,9 +207,13 @@ def service(cmd):
 
 
 
-if __name__=="__main__":
+if __name__ == "__main__":
+
 
     app.run(
+
         host="0.0.0.0",
+
         port=5000
+
     )
