@@ -533,52 +533,41 @@ button.btn-outline-primary:hover { background: #eff6ff; }
 <div id="toast">提示信息</div>
 
 <script>
-let serviceRunning = localStorage.getItem("service_running") !== "false"; 
-let serviceStartTime = parseInt(localStorage.getItem("service_start_time"), 10);
+let serverStartTime = null;
+let isServiceRunning = false;
 
-if (isNaN(serviceStartTime) || !serviceStartTime) {
-    serviceStartTime = Date.now();
-    localStorage.setItem("service_start_time", serviceStartTime);
+function formatUptime(seconds) {
+    if (seconds <= 0 || isNaN(seconds)) return "00:00:00";
+    let d = Math.floor(seconds / 86400);
+    let h = Math.floor((seconds % 86400) / 3600);
+    let m = Math.floor((seconds % 3600) / 60);
+    let s = Math.floor(seconds % 60);
+    let str = "";
+    if (d > 0) str += d + "天 ";
+    return str + String(h).padStart(2, '0') + ":" + String(m).padStart(2, '0') + ":" + String(s).padStart(2, '0');
 }
 
-function initServiceUI() {
+function updateUptimeDisplay() {
+    let uptimeEl = document.getElementById("service-uptime");
     let badge = document.getElementById("service-status-badge");
-    if (!serviceRunning) {
+
+    if (!isServiceRunning || !serverStartTime) {
         badge.innerText = "已停止";
         badge.className = "offline";
-    } else {
-        badge.innerText = "运行中";
-        badge.className = "online";
-    }
-}
-
-function updateUptime() {
-    let uptimeEl = document.getElementById("service-uptime");
-    if (!serviceRunning) {
         uptimeEl.innerText = "已停止";
         uptimeEl.style.color = "var(--text-muted)";
         return;
     }
 
+    badge.innerText = "运行中";
+    badge.className = "online";
     uptimeEl.style.color = "var(--text-main)";
-    let diffSec = Math.floor((Date.now() - serviceStartTime) / 1000);
-    if (diffSec < 0) diffSec = 0;
 
-    let days = Math.floor(diffSec / 86400);
-    let hours = Math.floor((diffSec % 86400) / 3600);
-    let mins = Math.floor((diffSec % 3600) / 60);
-    let secs = diffSec % 60;
-
-    let timeStr = "";
-    if (days > 0) timeStr += days + "天 ";
-    timeStr += String(hours).padStart(2, '0') + ":" + 
-               String(mins).padStart(2, '0') + ":" + 
-               String(secs).padStart(2, '0');
-
-    uptimeEl.innerText = timeStr;
+    let diffSec = Math.floor((Date.now() - serverStartTime) / 1000);
+    uptimeEl.innerText = formatUptime(diffSec);
 }
 
-setInterval(updateUptime, 1000);
+setInterval(updateUptimeDisplay, 1000);
 
 function showToast(msg) {
     let t = document.getElementById("toast");
@@ -587,14 +576,9 @@ function showToast(msg) {
     setTimeout(() => { t.classList.remove("show"); }, 3000);
 }
 
-// 通用剪贴板复制逻辑（兼容 HTTP 与 HTTPS 环境）
 function copyText(text) {
     if (navigator.clipboard && window.isSecureContext) {
-        navigator.clipboard.writeText(text).then(() => {
-            showToast(`已复制: ${text}`);
-        }).catch(() => {
-            fallbackCopy(text);
-        });
+        navigator.clipboard.writeText(text).then(() => showToast(`已复制: ${text}`)).catch(() => fallbackCopy(text));
     } else {
         fallbackCopy(text);
     }
@@ -612,58 +596,45 @@ function fallbackCopy(text) {
         document.execCommand('copy');
         showToast(`已复制: ${text}`);
     } catch (err) {
-        showToast("复制失败，请手动复制");
+        showToast("复制失败");
     }
     document.body.removeChild(textArea);
 }
 
-async function loadConfig(isInitial = false){
+async function loadConfigOnce(){
     try {
         let r = await fetch("/api/config");
-        if(!r.ok) throw new Error("配置文件加载失败");
+        if(!r.ok) return;
         let c = await r.json();
 
         let workerInput = document.getElementById("worker");
         let intervalInput = document.getElementById("interval");
 
-        if (isInitial || document.activeElement !== workerInput) {
-            workerInput.value = c.worker || "";
-        }
-        if (isInitial || document.activeElement !== intervalInput) {
-            intervalInput.value = c.interval || 60;
-        }
-        return c;
+        if (document.activeElement !== workerInput) workerInput.value = c.worker || "";
+        if (document.activeElement !== intervalInput) intervalInput.value = c.interval || 60;
     } catch(e) {
-        console.error(e);
-        return { nodes: [] };
+        console.error("加载配置失败:", e);
     }
 }
 
 async function loadStatus(){
     try {
-        let configReq = await fetch("/api/config");
-        let config = await configReq.json();
-
         let r = await fetch("/api/status");
         if(!r.ok) throw new Error("状态加载失败");
-        let status = await r.json();
+        let res = await r.json();
 
-        let map = {};
-        (status || []).forEach(n => { map[n.ip] = n; });
+        let data = res.nodes || [];
+        let svc = res.service || {};
 
-        let data = [];
+        isServiceRunning = svc.running;
+        if (svc.start_time) {
+            let parsedTime = new Date(svc.start_time).getTime();
+            if (!isNaN(parsedTime)) serverStartTime = parsedTime;
+        }
+
         let totalOnline = 0, totalOffline = 0, totalDelay = 0, delayCount = 0;
 
-        (config.nodes || []).forEach(n => {
-            let item = map[n.ip] || {
-                name: n.name,
-                ip: n.ip,
-                status: "检测中",
-                delay: "-",
-                last: "-",
-                fail: 0
-            };
-
+        data.forEach(item => {
             if(item.status === "在线") totalOnline++;
             if(item.status === "离线") totalOffline++;
             
@@ -672,8 +643,6 @@ async function loadStatus(){
                 totalDelay += numericDelay;
                 delayCount++;
             }
-
-            data.push(item);
         });
 
         document.getElementById("stat-total").innerText = data.length;
@@ -696,7 +665,6 @@ async function loadStatus(){
                 else delayStyle = 'class="delay-bad"';
             }
 
-            // 包含提示与图标的 IP 复制组件
             let ipHtml = `
               <span class="ip-code" title="点击复制 IP / 域名" onclick="copyText('${escapeHtml(n.ip)}')">
                 ${escapeHtml(n.ip)}
@@ -738,18 +706,23 @@ async function addNode(){
     }
 
     try {
-        await fetch("/api/add",{
+        let r = await fetch("/api/add",{
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ name, ip })
         });
+        let res = await r.json();
+        if(!res.ok) {
+            showToast(res.msg || "添加失败");
+            return;
+        }
 
         document.getElementById("name").value = "";
         document.getElementById("ip").value = "";
         showToast("节点添加成功");
         await loadStatus();
     } catch(e) {
-        showToast("添加失败，请检查网络");
+        showToast("添加失败，网络错误");
     }
 }
 
@@ -804,38 +777,18 @@ async function saveInterval(){
 
 async function service(a){
     try {
-        await fetch("/api/service/" + a);
+        let r = await fetch("/api/service/" + a, { method: "POST" });
+        let res = await r.json();
         let actionMap = { start: '启动', stop: '停止', restart: '重启' };
         let actionName = actionMap[a] || a;
         
-        let badge = document.getElementById("service-status-badge");
-        
-        if (a === 'stop') {
-            serviceRunning = false;
-            localStorage.setItem("service_running", "false");
-            badge.innerText = "已停止";
-            badge.className = "offline";
-        } else if (a === 'start') {
-            if (!serviceRunning) {
-                serviceStartTime = Date.now();
-                localStorage.setItem("service_start_time", serviceStartTime);
-            }
-            serviceRunning = true;
-            localStorage.setItem("service_running", "true");
-            badge.innerText = "运行中";
-            badge.className = "online";
-        } else if (a === 'restart') {
-            serviceStartTime = Date.now();
-            localStorage.setItem("service_start_time", serviceStartTime);
-            serviceRunning = true;
-            localStorage.setItem("service_running", "true");
-            badge.innerText = "运行中";
-            badge.className = "online";
+        if (res.ok) {
+            document.getElementById("last-action-time").innerText = new Date().toLocaleTimeString() + ` (${actionName})`;
+            showToast(`服务${actionName}指令已发送`);
+            setTimeout(loadStatus, 1000);
+        } else {
+            showToast(`操作失败: ${res.error || res.msg}`);
         }
-
-        updateUptime();
-        document.getElementById("last-action-time").innerText = new Date().toLocaleTimeString() + ` (${actionName})`;
-        showToast(`服务${actionName}指令已发送`);
     } catch(e) {
         showToast("指令发送失败");
     }
@@ -853,8 +806,13 @@ async function loadLogs(){
         let data = await r.json();
 
         let box = document.getElementById("logs");
+        let isAtBottom = (box.scrollHeight - box.clientHeight - box.scrollTop) <= 50;
+
         box.innerHTML = data.map(line => escapeHtml(line)).join("<br>");
-        box.scrollTop = box.scrollHeight;
+        
+        if (isAtBottom) {
+            box.scrollTop = box.scrollHeight;
+        }
     } catch(e) {
         console.error(e);
     }
@@ -870,12 +828,9 @@ function escapeHtml(str) {
         .replace(/'/g, "&#039;");
 }
 
-// 页面初始化
-initServiceUI();
-loadConfig(true);
+loadConfigOnce();
 loadStatus();
 loadLogs();
-updateUptime();
 
 let timerStatus, timerLogs;
 
