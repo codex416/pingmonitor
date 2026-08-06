@@ -8,51 +8,47 @@ import os
 import subprocess
 import time
 
-# 记录 Python 应用启动时间（作为兜底参考）
+# 应用启动时间标识
 APP_START_TIME = time.time()
 
-# 路径规范化
+# 路径配置
 BASE_DIR = "/opt/pingmonitor"
 CONFIG_FILE = os.path.join(BASE_DIR, "config.json")
 LOG_FILE = os.path.join(BASE_DIR, "logs", "monitor.log")
 STATUS_FILE = os.path.join(BASE_DIR, "status.json")
-
-# 上次指令状态存储文件（用于跨进程/重启持久化）
 LAST_ACTION_FILE = os.path.join(BASE_DIR, "last_action.json")
 
 app = Flask(__name__, template_folder="templates")
 
 
 # =====================
-# 工具函数（带原子写入与日志记录）
+# 工具函数
 # =====================
 
 def write_log(msg):
-    """向日志文件写入带有时间戳的操作日志（含权限自动修复）"""
+    """向日志文件写入带有时间戳的操作日志（含权限自愈机制）"""
     try:
         log_dir = os.path.dirname(LOG_FILE)
         if not os.path.exists(log_dir):
             os.makedirs(log_dir, exist_ok=True)
-            subprocess.run(["sudo", "chmod", "777", log_dir], check=False)
 
         timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
         log_entry = f"[{timestamp}] {msg}\n"
 
         try:
-            # 优先尝试直接写入
             with open(LOG_FILE, "a", encoding="utf-8") as f:
                 f.write(log_entry)
         except PermissionError:
-            # 遇到权限拒绝时（如日志被 root 创建），使用 sudo 强制追加并修复权限
-            cmd = f"echo {json.dumps(log_entry.strip())} | sudo tee -a '{LOG_FILE}' > /dev/null && sudo chmod 666 '{LOG_FILE}'"
-            subprocess.run(cmd, shell=True, check=False)
-
+            # 遭遇 root 创建文件的权限锁定时，使用 sudo 强行修改日志文件权限为 666 (全员可读写)
+            subprocess.run(["sudo", "chmod", "666", LOG_FILE], check=False)
+            with open(LOG_FILE, "a", encoding="utf-8") as f:
+                f.write(log_entry)
     except Exception as e:
-        print(f"[Error] 写入日志失败: {e}")
+        print(f"[Log Error] 写入日志失败: {e}")
 
 
 def load_config():
-    """读取配置文件，带默认值防护"""
+    """读取配置文件"""
     default_cfg = {"nodes": [], "worker": "", "interval": 60}
     if not os.path.exists(CONFIG_FILE):
         return default_cfg
@@ -62,19 +58,19 @@ def load_config():
             data = json.load(f)
             default_cfg.update(data)
             return default_cfg
-    except (json.JSONDecodeError, IOError) as e:
-        print(f"[Error] 读取配置文件失败: {e}")
+    except Exception as e:
+        print(f"[Config Error] 读取配置文件失败: {e}")
         return default_cfg
 
 
 def save_json_atomic(filepath, data):
-    """原子化写入 JSON，防止并发写入导致文件损坏"""
+    """原子化写入 JSON 避免文件损坏"""
     temp_file = f"{filepath}.tmp"
     try:
         os.makedirs(os.path.dirname(filepath), exist_ok=True)
         with open(temp_file, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=4, ensure_ascii=False)
-        os.replace(temp_file, filepath)  # 原子替换
+        os.replace(temp_file, filepath)
     except Exception as e:
         if os.path.exists(temp_file):
             os.remove(temp_file)
@@ -82,7 +78,6 @@ def save_json_atomic(filepath, data):
 
 
 def get_last_action():
-    """获取上次服务指令信息"""
     if os.path.exists(LAST_ACTION_FILE):
         try:
             with open(LAST_ACTION_FILE, "r", encoding="utf-8") as f:
@@ -94,7 +89,6 @@ def get_last_action():
 
 
 def set_last_action(action_str):
-    """保存上次服务指令信息"""
     try:
         save_json_atomic(LAST_ACTION_FILE, {"last_action": action_str})
     except Exception as e:
@@ -135,7 +129,7 @@ def add_node():
 
         cfg.setdefault("nodes", []).append({"name": name, "ip": ip})
         save_json_atomic(CONFIG_FILE, cfg)
-        
+
         write_log(f"添加节点成功: 名称=[{name}], IP/域名=[{ip}]")
         return jsonify({"ok": True})
     except Exception as e:
@@ -235,8 +229,8 @@ def status():
         cfg = load_config()
 
         result = [
-            status_data[ip] 
-            for n in cfg.get("nodes", []) 
+            status_data[ip]
+            for n in cfg.get("nodes", [])
             if (ip := n.get("ip")) in status_data
         ]
         return jsonify(result)
@@ -261,25 +255,33 @@ def logs():
 
 @app.route("/api/logs/clear", methods=["POST", "GET"])
 def clear_logs_file():
-    """彻底清空日志文件接口（强行重置权限）"""
+    """彻底清空日志接口（返回结果与日志写入完全解耦）"""
+    log_dir = os.path.dirname(LOG_FILE)
+    os.makedirs(log_dir, exist_ok=True)
+
+    cleared = False
+
+    # 1. 优先尝试 Python 原生清空
     try:
-        log_dir = os.path.dirname(LOG_FILE)
-        os.makedirs(log_dir, exist_ok=True)
-        
-        # 使用 sudo truncate 彻底清空并重置可读写权限 (666)
-        cmd = f"sudo truncate -s 0 '{LOG_FILE}' && sudo chmod 666 '{LOG_FILE}'"
-        res = subprocess.run(cmd, shell=True, capture_output=True, text=True)
-
+        with open(LOG_FILE, "w", encoding="utf-8") as f:
+            f.truncate(0)
+        cleared = True
+    except PermissionError:
+        # 2. 降级使用 sudo truncate 强行清空并修复权限
+        res = subprocess.run(["sudo", "/usr/bin/truncate", "-s", "0", LOG_FILE], capture_output=True)
         if res.returncode != 0:
-            with open(LOG_FILE, "w", encoding="utf-8") as f:
-                f.truncate(0)
+            res = subprocess.run(["sudo", "truncate", "-s", "0", LOG_FILE], capture_output=True)
 
+        subprocess.run(["sudo", "chmod", "666", LOG_FILE], check=False)
+        if res.returncode == 0:
+            cleared = True
+
+    # 3. 优先响应前端，确保页面显示成功
+    if cleared:
         write_log("系统终端日志已被清空并重新初始化")
         return jsonify({"ok": True})
-    except Exception as e:
-        err_msg = f"清空日志文件失败: {str(e)}"
-        print(f"[Error] {err_msg}")
-        return jsonify({"ok": False, "error": str(e)})
+    else:
+        return jsonify({"ok": False, "error": "无法清空日志文件，请检查系统权限"})
 
 
 @app.route("/api/service/<action>")
@@ -320,7 +322,6 @@ def service(action):
 
 @app.route("/api/system")
 def system_info():
-    """获取真实的服务运行状态、运行时间（秒）以及上次指令"""
     running = False
     uptime_sec = 0
 
@@ -357,7 +358,7 @@ def system_info():
         uptime_sec = int(time.time() - APP_START_TIME)
 
     return jsonify({
-        "running": running, 
+        "running": running,
         "uptime": uptime_sec,
         "last_action": get_last_action()
     })
