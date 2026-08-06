@@ -640,6 +640,10 @@ async function loadStatus(){
         if(!r.ok) throw new Error("状态加载失败");
         let status = await r.json();
 
+        let sysReq = await fetch("/api/system");
+        let sysData = sysReq.ok ? await sysReq.json() : { running: false };
+        let isRunning = sysData && sysData.running;
+
         let map = {};
         (status || []).forEach(n => { map[n.ip] = n; });
 
@@ -647,14 +651,26 @@ async function loadStatus(){
         let totalOnline = 0, totalOffline = 0, totalDelay = 0, delayCount = 0;
 
         (config.nodes || []).forEach(n => {
-            let item = map[n.ip] || {
-                name: n.name,
-                ip: n.ip,
-                status: "检测中",
-                delay: "-",
-                last: "-",
-                fail: 0
-            };
+            let item;
+            if (!isRunning) {
+                item = {
+                    name: n.name,
+                    ip: n.ip,
+                    status: "等待检测",
+                    delay: "-",
+                    last: "-",
+                    fail: (map[n.ip] && map[n.ip].fail !== undefined) ? map[n.ip].fail : 0
+                };
+            } else {
+                item = map[n.ip] ? { ...map[n.ip] } : {
+                    name: n.name,
+                    ip: n.ip,
+                    status: "检测中",
+                    delay: "-",
+                    last: "-",
+                    fail: 0
+                };
+            }
 
             if(item.status === "在线") totalOnline++;
             if(item.status === "离线") totalOffline++;
@@ -698,6 +714,8 @@ async function loadStatus(){
               </span>
             `;
 
+            let failCount = parseInt(n.fail) || 0;
+
             html += `
             <tr>
                 <td style="font-weight: 500;">${escapeHtml(n.name || '-')}</td>
@@ -705,7 +723,7 @@ async function loadStatus(){
                 <td><span class="${cls}">${escapeHtml(n.status)}</span></td>
                 <td ${delayStyle}>${escapeHtml(String(n.delay))}</td>
                 <td style="color: var(--text-muted); font-size: 13px;">${escapeHtml(String(n.last))}</td>
-                <td>${n.fail > 0 ? `<span style="color:#ef4444; font-weight:bold;">${n.fail}</span>` : 0}</td>
+                <td>${failCount > 0 ? `<span style="color:#ef4444; font-weight:bold;">${failCount}</span>` : 0}</td>
                 <td>
                     <button class="btn-outline-danger" onclick="delNode('${escapeHtml(n.ip)}')">删除</button>
                 </td>
@@ -806,7 +824,10 @@ async function service(a){
             showToast(`指令发送失败: ${res.error || '未知错误'}`);
         }
 
-        setTimeout(loadServiceStatus, 500);
+        setTimeout(async () => {
+            await loadServiceStatus();
+            await loadStatus();
+        }, 500);
     } catch(e) {
         showToast("指令发送失败");
     }
@@ -815,11 +836,14 @@ async function service(a){
 async function clearLogs(){
     if(!confirm("确定要清空系统终端日志吗？")) return;
     try {
-        await fetch("/api/logs/clear", { method: "POST" });
-        let box = document.getElementById("logs");
-        box.innerHTML = "日志已被清空。";
-        box.scrollTop = box.scrollHeight;
-        showToast("系统终端日志已清空");
+        let r = await fetch("/api/logs/clear", { method: "POST" });
+        let res = await r.json();
+        if (res.ok) {
+            await loadLogs();
+            showToast("系统终端日志已清空");
+        } else {
+            showToast(`清空日志失败: ${res.error || '未知错误'}`);
+        }
     } catch(e) {
         showToast("清空日志失败");
     }
