@@ -180,6 +180,40 @@ tbody tr:hover {
 
 tr:last-child td { border-bottom: none; }
 
+/* 复制 IP 标签交互 */
+.ip-code {
+  background: #f1f5f9;
+  padding: 4px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-family: monospace;
+  font-size: 13px;
+  color: #334155;
+  transition: all 0.2s;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  user-select: none;
+  border: 1px solid #e2e8f0;
+}
+
+.ip-code:hover {
+  background: #e2e8f0;
+  color: var(--primary);
+  border-color: #cbd5e1;
+}
+
+.ip-code svg {
+  width: 13px;
+  height: 13px;
+  opacity: 0.6;
+  transition: opacity 0.2s;
+}
+
+.ip-code:hover svg {
+  opacity: 1;
+}
+
 /* 状态与延迟样式 */
 .online, .offline, .checking {
   display: inline-flex;
@@ -284,7 +318,7 @@ button.btn-outline-primary {
 }
 button.btn-outline-primary:hover { background: #eff6ff; }
 
-/* 终端面板与日志框样式调整 */
+/* 终端面板与日志框样式 */
 .terminal-bar {
   display: flex;
   align-items: center;
@@ -319,24 +353,10 @@ button.btn-outline-primary:hover { background: #eff6ff; }
   word-break: break-all;
 }
 
-/* 终端滚动条美化 */
-#logs::-webkit-scrollbar {
-  width: 8px;
-}
-
-#logs::-webkit-scrollbar-track {
-  background: #0f172a;
-  border-bottom-right-radius: 12px;
-}
-
-#logs::-webkit-scrollbar-thumb {
-  background: #334155;
-  border-radius: 4px;
-}
-
-#logs::-webkit-scrollbar-thumb:hover {
-  background: #475569;
-}
+#logs::-webkit-scrollbar { width: 8px; }
+#logs::-webkit-scrollbar-track { background: #0f172a; border-bottom-right-radius: 12px; }
+#logs::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+#logs::-webkit-scrollbar-thumb:hover { background: #475569; }
 
 #toast {
   position: fixed;
@@ -460,12 +480,10 @@ button.btn-outline-primary:hover { background: #eff6ff; }
     </div>
   </div>
 
-  <!-- 实时日志：居左 (占 8 列) -->
   <div class="box col-8">
     <div class="box-header">
       <h3>实时系统日志</h3>
     </div>
-    
     <div>
       <div class="terminal-bar">
         <div class="terminal-dots">
@@ -478,7 +496,6 @@ button.btn-outline-primary:hover { background: #eff6ff; }
     </div>
   </div>
 
-  <!-- 服务控制：居右 (占 4 列) -->
   <div class="box col-4">
     <div>
       <div class="box-header">
@@ -486,7 +503,6 @@ button.btn-outline-primary:hover { background: #eff6ff; }
         <span class="online" id="service-status-badge">运行中</span>
       </div>
 
-      <!-- 服务核心指标卡片 -->
       <div style="background: #f8fafc; border: 1px solid var(--card-border); border-radius: 10px; padding: 12px 14px; margin-bottom: 16px;">
         <div style="display: flex; justify-content: space-between; align-items: center; font-size: 13px; margin-bottom: 8px;">
           <span style="color: var(--text-muted);">运行时间</span>
@@ -499,7 +515,6 @@ button.btn-outline-primary:hover { background: #eff6ff; }
       </div>
     </div>
 
-    <!-- 操作按钮组 -->
     <div>
       <div class="form-row" style="margin-bottom: 10px;">
         <button style="flex: 1;" onclick="service('start')">启动</button>
@@ -518,17 +533,14 @@ button.btn-outline-primary:hover { background: #eff6ff; }
 <div id="toast">提示信息</div>
 
 <script>
-// --- 核心改进：通过 localStorage 实现运行时间的跨页面/跨刷新持久累计 ---
 let serviceRunning = localStorage.getItem("service_running") !== "false"; 
 let serviceStartTime = parseInt(localStorage.getItem("service_start_time"), 10);
 
-// 如果是首次打开，初始化启动时间并持久化存储
 if (isNaN(serviceStartTime) || !serviceStartTime) {
     serviceStartTime = Date.now();
     localStorage.setItem("service_start_time", serviceStartTime);
 }
 
-// 初始化状态徽章与 UI
 function initServiceUI() {
     let badge = document.getElementById("service-status-badge");
     if (!serviceRunning) {
@@ -540,7 +552,6 @@ function initServiceUI() {
     }
 }
 
-// 实时更新运行时间（支持 天 / 时 / 分 / 秒）
 function updateUptime() {
     let uptimeEl = document.getElementById("service-uptime");
     if (!serviceRunning) {
@@ -576,14 +587,51 @@ function showToast(msg) {
     setTimeout(() => { t.classList.remove("show"); }, 3000);
 }
 
-async function loadConfig(){
+// 通用剪贴板复制逻辑（兼容 HTTP 与 HTTPS 环境）
+function copyText(text) {
+    if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(text).then(() => {
+            showToast(`已复制: ${text}`);
+        }).catch(() => {
+            fallbackCopy(text);
+        });
+    } else {
+        fallbackCopy(text);
+    }
+}
+
+function fallbackCopy(text) {
+    let textArea = document.createElement("textarea");
+    textArea.value = text;
+    textArea.style.position = "fixed";
+    textArea.style.left = "-9999px";
+    document.body.appendChild(textArea);
+    textArea.focus();
+    textArea.select();
+    try {
+        document.execCommand('copy');
+        showToast(`已复制: ${text}`);
+    } catch (err) {
+        showToast("复制失败，请手动复制");
+    }
+    document.body.removeChild(textArea);
+}
+
+async function loadConfig(isInitial = false){
     try {
         let r = await fetch("/api/config");
         if(!r.ok) throw new Error("配置文件加载失败");
         let c = await r.json();
 
-        document.getElementById("worker").value = c.worker || "";
-        document.getElementById("interval").value = c.interval || 60;
+        let workerInput = document.getElementById("worker");
+        let intervalInput = document.getElementById("interval");
+
+        if (isInitial || document.activeElement !== workerInput) {
+            workerInput.value = c.worker || "";
+        }
+        if (isInitial || document.activeElement !== intervalInput) {
+            intervalInput.value = c.interval || 60;
+        }
         return c;
     } catch(e) {
         console.error(e);
@@ -593,7 +641,9 @@ async function loadConfig(){
 
 async function loadStatus(){
     try {
-        let config = await loadConfig();
+        let configReq = await fetch("/api/config");
+        let config = await configReq.json();
+
         let r = await fetch("/api/status");
         if(!r.ok) throw new Error("状态加载失败");
         let status = await r.json();
@@ -646,10 +696,21 @@ async function loadStatus(){
                 else delayStyle = 'class="delay-bad"';
             }
 
+            // 包含提示与图标的 IP 复制组件
+            let ipHtml = `
+              <span class="ip-code" title="点击复制 IP / 域名" onclick="copyText('${escapeHtml(n.ip)}')">
+                ${escapeHtml(n.ip)}
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                  <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                </svg>
+              </span>
+            `;
+
             html += `
             <tr>
                 <td style="font-weight: 500;">${escapeHtml(n.name || '-')}</td>
-                <td><code style="background:#f1f5f9; padding:2px 6px; border-radius:4px; cursor:pointer;" title="点击复制" onclick="copyText('${escapeHtml(n.ip)}')">${escapeHtml(n.ip)}</code></td>
+                <td>${ipHtml}</td>
                 <td><span class="${cls}">${escapeHtml(n.status)}</span></td>
                 <td ${delayStyle}>${escapeHtml(String(n.delay))}</td>
                 <td style="color: var(--text-muted); font-size: 13px;">${escapeHtml(String(n.last))}</td>
@@ -665,11 +726,6 @@ async function loadStatus(){
     } catch(e) {
         console.error(e);
     }
-}
-
-function copyText(text) {
-    navigator.clipboard.writeText(text);
-    showToast(`已复制: ${text}`);
 }
 
 async function addNode(){
@@ -746,7 +802,6 @@ async function saveInterval(){
     }
 }
 
-// 服务控制函数逻辑精细化分支
 async function service(a){
     try {
         await fetch("/api/service/" + a);
@@ -756,13 +811,11 @@ async function service(a){
         let badge = document.getElementById("service-status-badge");
         
         if (a === 'stop') {
-            // 停止：暂停计时并持久化
             serviceRunning = false;
             localStorage.setItem("service_running", "false");
             badge.innerText = "已停止";
             badge.className = "offline";
         } else if (a === 'start') {
-            // 启动：若原本属于已停止状态，则开启新计时；若原本就在运行，保持计时不重置！
             if (!serviceRunning) {
                 serviceStartTime = Date.now();
                 localStorage.setItem("service_start_time", serviceStartTime);
@@ -772,7 +825,6 @@ async function service(a){
             badge.innerText = "运行中";
             badge.className = "online";
         } else if (a === 'restart') {
-            // 重启：显式清零并重新开始计时
             serviceStartTime = Date.now();
             localStorage.setItem("service_start_time", serviceStartTime);
             serviceRunning = true;
@@ -818,8 +870,9 @@ function escapeHtml(str) {
         .replace(/'/g, "&#039;");
 }
 
-// 页面加载时执行初始化
+// 页面初始化
 initServiceUI();
+loadConfig(true);
 loadStatus();
 loadLogs();
 updateUptime();
