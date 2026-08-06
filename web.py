@@ -7,7 +7,7 @@ import os
 import re
 import subprocess
 from pathlib import Path
-from threading import Lock
+from threading import RLock  # 使用可重入锁替换原 Lock，防止嵌套锁导致死锁
 from flask import Flask, jsonify, render_template, request
 
 # 配置日志格式
@@ -21,8 +21,8 @@ STATUS_FILE = BASE_DIR / "status.json"
 
 app = Flask(__name__, template_folder="templates")
 
-# 全局文件读写锁（防止并发竞态条件）
-file_lock = Lock()
+# 全局文件读写锁（使用可重入锁 RLock，允许同一线程内重入锁）
+file_lock = RLock()
 
 # IP 及域名基础正则校验
 IP_DOMAIN_REGEX = re.compile(
