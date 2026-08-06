@@ -35,6 +35,7 @@ echo "创建目录"
 
 
 mkdir -p $APP_DIR/templates
+mkdir -p $APP_DIR/logs
 
 
 
@@ -76,6 +77,8 @@ www-data ALL=(ALL) NOPASSWD: /bin/systemctl stop pingmonitor
 
 www-data ALL=(ALL) NOPASSWD: /bin/systemctl restart pingmonitor
 
+www-data ALL=(ALL) NOPASSWD: /usr/bin/truncate
+
 EOF
 
 
@@ -90,6 +93,7 @@ echo "设置文件权限"
 
 
 chown -R www-data:www-data $APP_DIR
+chmod -R 777 $APP_DIR/logs
 
 
 
