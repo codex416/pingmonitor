@@ -314,12 +314,12 @@ button.btn-outline-primary:hover { background: #eff6ff; }
   border-bottom-left-radius: 12px;
   border-bottom-right-radius: 12px;
   font-family: "JetBrains Mono", Consolas, Monaco, "Courier New", monospace;
-  font-size: 14px; /* PC端字体调大为 14px */
+  font-size: 14px;
   line-height: 1.7;
   word-break: break-all;
 }
 
-/* 终端滚动条美化（暗色系融入） */
+/* 终端滚动条美化 */
 #logs::-webkit-scrollbar {
   width: 8px;
 }
@@ -518,9 +518,29 @@ button.btn-outline-primary:hover { background: #eff6ff; }
 <div id="toast">提示信息</div>
 
 <script>
-let serviceRunning = true;
-let serviceStartTime = Date.now();
+// --- 核心改进：通过 localStorage 实现运行时间的跨页面/跨刷新持久累计 ---
+let serviceRunning = localStorage.getItem("service_running") !== "false"; 
+let serviceStartTime = parseInt(localStorage.getItem("service_start_time"), 10);
 
+// 如果是首次打开，初始化启动时间并持久化存储
+if (isNaN(serviceStartTime) || !serviceStartTime) {
+    serviceStartTime = Date.now();
+    localStorage.setItem("service_start_time", serviceStartTime);
+}
+
+// 初始化状态徽章与 UI
+function initServiceUI() {
+    let badge = document.getElementById("service-status-badge");
+    if (!serviceRunning) {
+        badge.innerText = "已停止";
+        badge.className = "offline";
+    } else {
+        badge.innerText = "运行中";
+        badge.className = "online";
+    }
+}
+
+// 实时更新运行时间（支持 天 / 时 / 分 / 秒）
 function updateUptime() {
     let uptimeEl = document.getElementById("service-uptime");
     if (!serviceRunning) {
@@ -531,6 +551,8 @@ function updateUptime() {
 
     uptimeEl.style.color = "var(--text-main)";
     let diffSec = Math.floor((Date.now() - serviceStartTime) / 1000);
+    if (diffSec < 0) diffSec = 0;
+
     let days = Math.floor(diffSec / 86400);
     let hours = Math.floor((diffSec % 86400) / 3600);
     let mins = Math.floor((diffSec % 3600) / 60);
@@ -724,6 +746,7 @@ async function saveInterval(){
     }
 }
 
+// 服务控制函数逻辑精细化分支
 async function service(a){
     try {
         await fetch("/api/service/" + a);
@@ -731,13 +754,29 @@ async function service(a){
         let actionName = actionMap[a] || a;
         
         let badge = document.getElementById("service-status-badge");
+        
         if (a === 'stop') {
+            // 停止：暂停计时并持久化
             serviceRunning = false;
+            localStorage.setItem("service_running", "false");
             badge.innerText = "已停止";
             badge.className = "offline";
-        } else if (a === 'start' || a === 'restart') {
+        } else if (a === 'start') {
+            // 启动：若原本属于已停止状态，则开启新计时；若原本就在运行，保持计时不重置！
+            if (!serviceRunning) {
+                serviceStartTime = Date.now();
+                localStorage.setItem("service_start_time", serviceStartTime);
+            }
             serviceRunning = true;
+            localStorage.setItem("service_running", "true");
+            badge.innerText = "运行中";
+            badge.className = "online";
+        } else if (a === 'restart') {
+            // 重启：显式清零并重新开始计时
             serviceStartTime = Date.now();
+            localStorage.setItem("service_start_time", serviceStartTime);
+            serviceRunning = true;
+            localStorage.setItem("service_running", "true");
             badge.innerText = "运行中";
             badge.className = "online";
         }
@@ -779,6 +818,8 @@ function escapeHtml(str) {
         .replace(/'/g, "&#039;");
 }
 
+// 页面加载时执行初始化
+initServiceUI();
 loadStatus();
 loadLogs();
 updateUptime();
