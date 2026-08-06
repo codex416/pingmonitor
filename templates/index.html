@@ -28,7 +28,6 @@ body {
   padding-bottom: 40px;
 }
 
-/* 顶部栏圆角卡片化设计 */
 header {
   background: var(--card-bg);
   border: 1px solid var(--card-border);
@@ -146,7 +145,6 @@ h1::before {
   width: 100%;
 }
 
-/* 表格样式 */
 .table-wrapper {
   width: 100%;
   overflow-x: auto;
@@ -180,7 +178,6 @@ tbody tr:hover {
 
 tr:last-child td { border-bottom: none; }
 
-/* 复制 IP 标签交互 */
 .ip-code {
   background: #f1f5f9;
   padding: 4px 10px;
@@ -214,7 +211,6 @@ tr:last-child td { border-bottom: none; }
   opacity: 1;
 }
 
-/* 状态与延迟样式 */
 .online, .offline, .checking {
   display: inline-flex;
   align-items: center;
@@ -247,7 +243,6 @@ tr:last-child td { border-bottom: none; }
   to { opacity: 1; }
 }
 
-/* 全局控件规范 */
 input {
   width: 100%;
   height: 42px !important;
@@ -318,7 +313,6 @@ button.btn-outline-primary {
 }
 button.btn-outline-primary:hover { background: #eff6ff; }
 
-/* 终端面板与日志框样式 */
 .terminal-bar {
   display: flex;
   align-items: center;
@@ -548,13 +542,6 @@ function formatUptime(diffSec) {
     return timeStr;
 }
 
-function loadLastAction() {
-    let savedAction = localStorage.getItem("last_action_time");
-    if (savedAction) {
-        document.getElementById("last-action-time").innerText = savedAction;
-    }
-}
-
 async function loadServiceStatus() {
     try {
         let r = await fetch("/api/system");
@@ -563,6 +550,7 @@ async function loadServiceStatus() {
 
         let badge = document.getElementById("service-status-badge");
         let uptimeEl = document.getElementById("service-uptime");
+        let lastActionEl = document.getElementById("last-action-time");
 
         if (data.running) {
             badge.innerText = "运行中";
@@ -574,6 +562,11 @@ async function loadServiceStatus() {
             badge.className = "offline";
             uptimeEl.innerText = "已停止";
             uptimeEl.style.color = "var(--text-muted)";
+        }
+
+        // 实时从后端同步上次指令状态
+        if (data.last_action) {
+            lastActionEl.innerText = data.last_action;
         }
     } catch(e) {
         console.error(e);
@@ -587,7 +580,6 @@ function showToast(msg) {
     setTimeout(() => { t.classList.remove("show"); }, 3000);
 }
 
-// 通用剪贴板复制逻辑（兼容 HTTP 与 HTTPS 环境）
 function copyText(text) {
     if (navigator.clipboard && window.isSecureContext) {
         navigator.clipboard.writeText(text).then(() => {
@@ -696,7 +688,6 @@ async function loadStatus(){
                 else delayStyle = 'class="delay-bad"';
             }
 
-            // 包含提示与图标的 IP 复制组件
             let ipHtml = `
               <span class="ip-code" title="点击复制 IP / 域名" onclick="copyText('${escapeHtml(n.ip)}')">
                 ${escapeHtml(n.ip)}
@@ -804,27 +795,34 @@ async function saveInterval(){
 
 async function service(a){
     try {
-        await fetch("/api/service/" + a);
+        let r = await fetch("/api/service/" + a);
+        let res = await r.json();
         let actionMap = { start: '启动', stop: '停止', restart: '重启' };
         let actionName = actionMap[a] || a;
         
-        let actionStr = new Date().toLocaleTimeString() + ` (${actionName})`;
-        localStorage.setItem("last_action_time", actionStr);
-        document.getElementById("last-action-time").innerText = actionStr;
+        if (res.ok) {
+            showToast(`服务${actionName}指令已发送`);
+        } else {
+            showToast(`指令发送失败: ${res.error || '未知错误'}`);
+        }
 
-        showToast(`服务${actionName}指令已发送`);
-
-        setTimeout(loadServiceStatus, 1000);
+        setTimeout(loadServiceStatus, 500);
     } catch(e) {
         showToast("指令发送失败");
     }
 }
 
-function clearLogs(){
-    let box = document.getElementById("logs");
-    box.innerHTML = "日志已被清空。";
-    box.scrollTop = box.scrollHeight;
-    showToast("系统终端日志已清空");
+async function clearLogs(){
+    if(!confirm("确定要清空系统终端日志吗？")) return;
+    try {
+        await fetch("/api/logs/clear", { method: "POST" });
+        let box = document.getElementById("logs");
+        box.innerHTML = "日志已被清空。";
+        box.scrollTop = box.scrollHeight;
+        showToast("系统终端日志已清空");
+    } catch(e) {
+        showToast("清空日志失败");
+    }
 }
 
 async function loadLogs(){
@@ -834,6 +832,10 @@ async function loadLogs(){
         let data = await r.json();
 
         let box = document.getElementById("logs");
+        if(data.length === 0) {
+            box.innerHTML = "暂无日志或日志已被清空。";
+            return;
+        }
         box.innerHTML = data.map(line => escapeHtml(line)).join("<br>");
         
         setTimeout(() => {
@@ -855,7 +857,6 @@ function escapeHtml(str) {
 }
 
 // 页面初始化
-loadLastAction();
 loadConfig(true);
 loadStatus();
 loadLogs();
