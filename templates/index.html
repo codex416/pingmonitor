@@ -508,7 +508,7 @@ button.btn-outline-primary:hover { background: #eff6ff; }
           <span style="color: var(--text-muted);">运行时间</span>
           <span style="font-weight: 600; font-family: monospace;" id="service-uptime">--:--:--</span>
         </div>
-        <div style="display: flex; justify-content: space-between; align-align: center; font-size: 13px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; font-size: 13px;">
           <span style="color: var(--text-muted);">上次指令</span>
           <span style="font-size: 12px; color: var(--text-muted);" id="last-action-time">无动作</span>
         </div>
@@ -580,7 +580,7 @@ function showToast(msg) {
     setTimeout(() => { t.classList.remove("show"); }, 3000);
 }
 
-// 通用剪贴板复制逻辑（兼容 HTTP 与 HTTPS 环境）
+// 通用剪贴板复制逻辑
 function copyText(text) {
     if (navigator.clipboard && window.isSecureContext) {
         navigator.clipboard.writeText(text).then(() => {
@@ -689,7 +689,6 @@ async function loadStatus(){
                 else delayStyle = 'class="delay-bad"';
             }
 
-            // 包含提示与图标的 IP 复制组件
             let ipHtml = `
               <span class="ip-code" title="点击复制 IP / 域名" onclick="copyText('${escapeHtml(n.ip)}')">
                 ${escapeHtml(n.ip)}
@@ -731,18 +730,23 @@ async function addNode(){
     }
 
     try {
-        await fetch("/api/add",{
+        let r = await fetch("/api/add",{
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ name, ip })
         });
+        let data = await r.json();
 
-        document.getElementById("name").value = "";
-        document.getElementById("ip").value = "";
-        showToast("节点添加成功");
-        await loadStatus();
+        if (data.ok) {
+            document.getElementById("name").value = "";
+            document.getElementById("ip").value = "";
+            showToast("节点添加成功");
+            await loadStatus();
+        } else {
+            showToast(data.msg || "添加失败");
+        }
     } catch(e) {
-        showToast("添加失败，请检查网络");
+        showToast("添加失败，请检查网络或后端日志");
     }
 }
 
@@ -750,13 +754,18 @@ async function delNode(ip){
     if(!confirm(`确定要删除节点 [${ip}] 吗？`)) return;
 
     try {
-        await fetch("/api/delete",{
+        let r = await fetch("/api/delete",{
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ ip })
         });
-        showToast("节点已删除");
-        await loadStatus();
+        let data = await r.json();
+        if(data.ok) {
+            showToast("节点已删除");
+            await loadStatus();
+        } else {
+            showToast(data.msg || "删除失败");
+        }
     } catch(e) {
         showToast("删除失败");
     }
@@ -765,12 +774,17 @@ async function delNode(ip){
 async function saveWorker(){
     let worker = document.getElementById("worker").value.trim();
     try {
-        await fetch("/api/worker",{
+        let r = await fetch("/api/worker",{
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ worker })
         });
-        showToast("Telegram Worker 已保存");
+        let data = await r.json();
+        if(data.ok) {
+            showToast("Telegram Worker 已保存");
+        } else {
+            showToast(data.msg || "保存失败");
+        }
     } catch(e) {
         showToast("保存失败");
     }
@@ -784,12 +798,17 @@ async function saveInterval(){
     }
 
     try {
-        await fetch("/api/interval",{
+        let r = await fetch("/api/interval",{
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ interval })
         });
-        showToast("检测间隔已更新");
+        let data = await r.json();
+        if(data.ok) {
+            showToast("检测间隔已更新");
+        } else {
+            showToast(data.msg || "保存失败");
+        }
     } catch(e) {
         showToast("保存失败");
     }
@@ -834,7 +853,7 @@ function escapeHtml(str) {
     return String(str)
         .replace(/&/g, "&amp;")
         .replace(/</g, "&lt;")
-        .replace(//>/g, "&gt;")
+        .replace(/>/g, "&gt;")
         .replace(/"/g, "&quot;")
         .replace(/'/g, "&#039;");
 }
