@@ -548,6 +548,13 @@ function formatUptime(diffSec) {
     return timeStr;
 }
 
+function loadLastAction() {
+    let savedAction = localStorage.getItem("last_action_time");
+    if (savedAction) {
+        document.getElementById("last-action-time").innerText = savedAction;
+    }
+}
+
 async function loadServiceStatus() {
     try {
         let r = await fetch("/api/system");
@@ -580,7 +587,7 @@ function showToast(msg) {
     setTimeout(() => { t.classList.remove("show"); }, 3000);
 }
 
-// 通用剪贴板复制逻辑
+// 通用剪贴板复制逻辑（兼容 HTTP 与 HTTPS 环境）
 function copyText(text) {
     if (navigator.clipboard && window.isSecureContext) {
         navigator.clipboard.writeText(text).then(() => {
@@ -689,6 +696,7 @@ async function loadStatus(){
                 else delayStyle = 'class="delay-bad"';
             }
 
+            // 包含提示与图标的 IP 复制组件
             let ipHtml = `
               <span class="ip-code" title="点击复制 IP / 域名" onclick="copyText('${escapeHtml(n.ip)}')">
                 ${escapeHtml(n.ip)}
@@ -730,23 +738,18 @@ async function addNode(){
     }
 
     try {
-        let r = await fetch("/api/add",{
+        await fetch("/api/add",{
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ name, ip })
         });
-        let data = await r.json();
 
-        if (data.ok) {
-            document.getElementById("name").value = "";
-            document.getElementById("ip").value = "";
-            showToast("节点添加成功");
-            await loadStatus();
-        } else {
-            showToast(data.msg || "添加失败");
-        }
+        document.getElementById("name").value = "";
+        document.getElementById("ip").value = "";
+        showToast("节点添加成功");
+        await loadStatus();
     } catch(e) {
-        showToast("添加失败，请检查网络或后端日志");
+        showToast("添加失败，请检查网络");
     }
 }
 
@@ -754,18 +757,13 @@ async function delNode(ip){
     if(!confirm(`确定要删除节点 [${ip}] 吗？`)) return;
 
     try {
-        let r = await fetch("/api/delete",{
+        await fetch("/api/delete",{
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ ip })
         });
-        let data = await r.json();
-        if(data.ok) {
-            showToast("节点已删除");
-            await loadStatus();
-        } else {
-            showToast(data.msg || "删除失败");
-        }
+        showToast("节点已删除");
+        await loadStatus();
     } catch(e) {
         showToast("删除失败");
     }
@@ -774,17 +772,12 @@ async function delNode(ip){
 async function saveWorker(){
     let worker = document.getElementById("worker").value.trim();
     try {
-        let r = await fetch("/api/worker",{
+        await fetch("/api/worker",{
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ worker })
         });
-        let data = await r.json();
-        if(data.ok) {
-            showToast("Telegram Worker 已保存");
-        } else {
-            showToast(data.msg || "保存失败");
-        }
+        showToast("Telegram Worker 已保存");
     } catch(e) {
         showToast("保存失败");
     }
@@ -798,17 +791,12 @@ async function saveInterval(){
     }
 
     try {
-        let r = await fetch("/api/interval",{
+        await fetch("/api/interval",{
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ interval })
         });
-        let data = await r.json();
-        if(data.ok) {
-            showToast("检测间隔已更新");
-        } else {
-            showToast(data.msg || "保存失败");
-        }
+        showToast("检测间隔已更新");
     } catch(e) {
         showToast("保存失败");
     }
@@ -819,8 +807,11 @@ async function service(a){
         await fetch("/api/service/" + a);
         let actionMap = { start: '启动', stop: '停止', restart: '重启' };
         let actionName = actionMap[a] || a;
+        
+        let actionStr = new Date().toLocaleTimeString() + ` (${actionName})`;
+        localStorage.setItem("last_action_time", actionStr);
+        document.getElementById("last-action-time").innerText = actionStr;
 
-        document.getElementById("last-action-time").innerText = new Date().toLocaleTimeString() + ` (${actionName})`;
         showToast(`服务${actionName}指令已发送`);
 
         setTimeout(loadServiceStatus, 1000);
@@ -830,7 +821,9 @@ async function service(a){
 }
 
 function clearLogs(){
-    document.getElementById("logs").innerHTML = "日志已被清空。";
+    let box = document.getElementById("logs");
+    box.innerHTML = "日志已被清空。";
+    box.scrollTop = box.scrollHeight;
     showToast("系统终端日志已清空");
 }
 
@@ -842,7 +835,10 @@ async function loadLogs(){
 
         let box = document.getElementById("logs");
         box.innerHTML = data.map(line => escapeHtml(line)).join("<br>");
-        box.scrollTop = box.scrollHeight;
+        
+        setTimeout(() => {
+            box.scrollTop = box.scrollHeight;
+        }, 0);
     } catch(e) {
         console.error(e);
     }
@@ -859,6 +855,7 @@ function escapeHtml(str) {
 }
 
 // 页面初始化
+loadLastAction();
 loadConfig(true);
 loadStatus();
 loadLogs();
