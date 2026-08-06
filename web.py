@@ -28,12 +28,25 @@ app = Flask(__name__, template_folder="templates")
 # =====================
 
 def write_log(msg):
-    """向日志文件写入带有时间戳的操作日志"""
+    """向日志文件写入带有时间戳的操作日志（含权限自动修复）"""
     try:
-        os.makedirs(os.path.dirname(LOG_FILE), exist_ok=True)
+        log_dir = os.path.dirname(LOG_FILE)
+        if not os.path.exists(log_dir):
+            os.makedirs(log_dir, exist_ok=True)
+            subprocess.run(["sudo", "chmod", "777", log_dir], check=False)
+
         timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
-        with open(LOG_FILE, "a", encoding="utf-8") as f:
-            f.write(f"[{timestamp}] {msg}\n")
+        log_entry = f"[{timestamp}] {msg}\n"
+
+        try:
+            # 优先尝试直接写入
+            with open(LOG_FILE, "a", encoding="utf-8") as f:
+                f.write(log_entry)
+        except PermissionError:
+            # 遇到权限拒绝时（如日志被 root 创建），使用 sudo 强制追加并修复权限
+            cmd = f"echo {json.dumps(log_entry.strip())} | sudo tee -a '{LOG_FILE}' > /dev/null && sudo chmod 666 '{LOG_FILE}'"
+            subprocess.run(cmd, shell=True, check=False)
+
     except Exception as e:
         print(f"[Error] 写入日志失败: {e}")
 
@@ -248,20 +261,23 @@ def logs():
 
 @app.route("/api/logs/clear", methods=["POST", "GET"])
 def clear_logs_file():
-    """彻底清空日志文件接口"""
+    """彻底清空日志文件接口（强行重置权限）"""
     try:
-        os.makedirs(os.path.dirname(LOG_FILE), exist_ok=True)
-        try:
+        log_dir = os.path.dirname(LOG_FILE)
+        os.makedirs(log_dir, exist_ok=True)
+        
+        # 使用 sudo truncate 彻底清空并重置可读写权限 (666)
+        cmd = f"sudo truncate -s 0 '{LOG_FILE}' && sudo chmod 666 '{LOG_FILE}'"
+        res = subprocess.run(cmd, shell=True, capture_output=True, text=True)
+
+        if res.returncode != 0:
             with open(LOG_FILE, "w", encoding="utf-8") as f:
-                f.write("")
-        except PermissionError:
-            subprocess.run(["sudo", "truncate", "-s", "0", LOG_FILE], check=False)
+                f.truncate(0)
 
         write_log("系统终端日志已被清空并重新初始化")
         return jsonify({"ok": True})
     except Exception as e:
         err_msg = f"清空日志文件失败: {str(e)}"
-        write_log(err_msg)
         print(f"[Error] {err_msg}")
         return jsonify({"ok": False, "error": str(e)})
 
