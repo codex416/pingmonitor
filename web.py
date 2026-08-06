@@ -104,92 +104,110 @@ def api_config():
 
 @app.route("/api/add", methods=["POST"])
 def add_node():
-    data = request.get_json(silent=True) or {}
-    ip = str(data.get("ip", "")).strip()
-    name = str(data.get("name", "")).strip() or ip
+    try:
+        data = request.get_json(silent=True) or {}
+        ip = str(data.get("ip", "")).strip()
+        name = str(data.get("name", "")).strip() or ip
 
-    if not ip:
-        write_log("添加节点失败: IP或域名不能为空")
-        return jsonify({"ok": False, "msg": "IP或域名不能为空"})
+        if not ip:
+            write_log("添加节点失败: IP或域名不能为空")
+            return jsonify({"ok": False, "msg": "IP或域名不能为空"})
 
-    cfg = load_config()
+        cfg = load_config()
 
-    for n in cfg["nodes"]:
-        if n.get("ip") == ip:
-            write_log(f"添加节点失败: 节点 [{ip}] 已存在")
-            return jsonify({"ok": False, "msg": "节点已存在"})
+        for n in cfg.get("nodes", []):
+            if n.get("ip") == ip:
+                write_log(f"添加节点失败: 节点 [{ip}] 已存在")
+                return jsonify({"ok": False, "msg": "节点已存在"})
 
-    cfg["nodes"].append({"name": name, "ip": ip})
-    save_json_atomic(CONFIG_FILE, cfg)
-    
-    write_log(f"添加节点成功: 名称=[{name}], IP/域名=[{ip}]")
-    return jsonify({"ok": True})
+        cfg.setdefault("nodes", []).append({"name": name, "ip": ip})
+        save_json_atomic(CONFIG_FILE, cfg)
+        
+        write_log(f"添加节点成功: 名称=[{name}], IP/域名=[{ip}]")
+        return jsonify({"ok": True})
+    except Exception as e:
+        write_log(f"添加节点异常: {str(e)}")
+        return jsonify({"ok": False, "error": str(e)})
 
 
 @app.route("/api/delete", methods=["POST"])
 def delete_node():
-    data = request.get_json(silent=True) or {}
-    ip = str(data.get("ip", "")).strip()
+    try:
+        data = request.get_json(silent=True) or {}
+        ip = str(data.get("ip", "")).strip()
 
-    if not ip:
-        write_log("删除节点失败: IP不能为空")
-        return jsonify({"ok": False, "msg": "IP不能为空"})
+        if not ip:
+            write_log("删除节点失败: IP不能为空")
+            return jsonify({"ok": False, "msg": "IP不能为空"})
 
-    cfg = load_config()
-    before_len = len(cfg["nodes"])
-    cfg["nodes"] = [n for n in cfg["nodes"] if n.get("ip") != ip]
-    deleted_count = before_len - len(cfg["nodes"])
+        cfg = load_config()
+        before_len = len(cfg.get("nodes", []))
+        cfg["nodes"] = [n for n in cfg.get("nodes", []) if n.get("ip") != ip]
+        deleted_count = before_len - len(cfg["nodes"])
 
-    if deleted_count > 0:
-        save_json_atomic(CONFIG_FILE, cfg)
+        if deleted_count > 0:
+            save_json_atomic(CONFIG_FILE, cfg)
+            write_log(f"删除节点成功: IP/域名=[{ip}]")
+        else:
+            write_log(f"删除节点失败: 未找到节点 [{ip}]")
 
-    if os.path.exists(STATUS_FILE):
-        try:
-            with open(STATUS_FILE, "r", encoding="utf-8") as f:
-                status = json.load(f)
+        if os.path.exists(STATUS_FILE):
+            try:
+                with open(STATUS_FILE, "r", encoding="utf-8") as f:
+                    status = json.load(f)
 
-            if ip in status:
-                del status[ip]
-                save_json_atomic(STATUS_FILE, status)
-        except Exception as e:
-            print(f"[Warning] 删除状态节点失败: {e}")
+                if ip in status:
+                    del status[ip]
+                    save_json_atomic(STATUS_FILE, status)
+            except Exception as e:
+                print(f"[Warning] 删除状态节点失败: {e}")
 
-    write_log(f"删除节点成功: IP/域名=[{ip}]")
-    return jsonify({"ok": True, "deleted": deleted_count})
+        return jsonify({"ok": True, "deleted": deleted_count})
+    except Exception as e:
+        write_log(f"删除节点异常: {str(e)}")
+        return jsonify({"ok": False, "error": str(e)})
 
 
 @app.route("/api/worker", methods=["POST"])
 def worker():
-    data = request.get_json(silent=True) or {}
-    worker_url = str(data.get("worker", "")).strip()
+    try:
+        data = request.get_json(silent=True) or {}
+        worker_url = str(data.get("worker", "")).strip()
 
-    cfg = load_config()
-    cfg["worker"] = worker_url
-    save_json_atomic(CONFIG_FILE, cfg)
+        cfg = load_config()
+        cfg["worker"] = worker_url
+        save_json_atomic(CONFIG_FILE, cfg)
 
-    write_log(f"更新 Telegram Worker 配置: URL=[{worker_url}]")
-    return jsonify({"ok": True})
+        write_log(f"更新 Telegram Worker 配置: URL=[{worker_url if worker_url else '空'}]")
+        return jsonify({"ok": True})
+    except Exception as e:
+        write_log(f"更新 Telegram Worker 配置失败: {str(e)}")
+        return jsonify({"ok": False, "error": str(e)})
 
 
 @app.route("/api/interval", methods=["POST"])
 def interval():
-    data = request.get_json(silent=True) or {}
-    raw_val = data.get("interval", 60)
-
     try:
-        value = int(raw_val)
-    except (ValueError, TypeError):
-        value = 60
+        data = request.get_json(silent=True) or {}
+        raw_val = data.get("interval", 60)
 
-    if value < 5:
-        value = 5
+        try:
+            value = int(raw_val)
+        except (ValueError, TypeError):
+            value = 60
 
-    cfg = load_config()
-    cfg["interval"] = value
-    save_json_atomic(CONFIG_FILE, cfg)
+        if value < 5:
+            value = 5
 
-    write_log(f"更新检测频率: [{value}] 秒")
-    return jsonify({"ok": True, "interval": value})
+        cfg = load_config()
+        cfg["interval"] = value
+        save_json_atomic(CONFIG_FILE, cfg)
+
+        write_log(f"更新检测频率成功: [{value}] 秒")
+        return jsonify({"ok": True, "interval": value})
+    except Exception as e:
+        write_log(f"更新检测频率失败: {str(e)}")
+        return jsonify({"ok": False, "error": str(e)})
 
 
 @app.route("/api/status")
@@ -205,7 +223,7 @@ def status():
 
         result = [
             status_data[ip] 
-            for n in cfg["nodes"] 
+            for n in cfg.get("nodes", []) 
             if (ip := n.get("ip")) in status_data
         ]
         return jsonify(result)
@@ -228,17 +246,23 @@ def logs():
         return jsonify([])
 
 
-@app.route("/api/logs/clear", methods=["POST"])
+@app.route("/api/logs/clear", methods=["POST", "GET"])
 def clear_logs_file():
     """彻底清空日志文件接口"""
     try:
         os.makedirs(os.path.dirname(LOG_FILE), exist_ok=True)
-        with open(LOG_FILE, "w", encoding="utf-8") as f:
-            f.truncate(0)
+        try:
+            with open(LOG_FILE, "w", encoding="utf-8") as f:
+                f.write("")
+        except PermissionError:
+            subprocess.run(["sudo", "truncate", "-s", "0", LOG_FILE], check=False)
+
         write_log("系统终端日志已被清空并重新初始化")
         return jsonify({"ok": True})
     except Exception as e:
-        print(f"[Error] 清空日志文件失败: {e}")
+        err_msg = f"清空日志文件失败: {str(e)}"
+        write_log(err_msg)
+        print(f"[Error] {err_msg}")
         return jsonify({"ok": False, "error": str(e)})
 
 
