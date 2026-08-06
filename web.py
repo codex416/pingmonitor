@@ -17,6 +17,9 @@ CONFIG_FILE = os.path.join(BASE_DIR, "config.json")
 LOG_FILE = os.path.join(BASE_DIR, "logs", "monitor.log")
 STATUS_FILE = os.path.join(BASE_DIR, "status.json")
 
+# 上次指令状态存储文件（用于跨进程/重启持久化）
+LAST_ACTION_FILE = os.path.join(BASE_DIR, "last_action.json")
+
 app = Flask(__name__, template_folder="templates")
 
 
@@ -33,7 +36,6 @@ def load_config():
     try:
         with open(CONFIG_FILE, "r", encoding="utf-8") as f:
             data = json.load(f)
-            # 保证基础键存在
             default_cfg.update(data)
             return default_cfg
     except (json.JSONDecodeError, IOError) as e:
@@ -55,6 +57,26 @@ def save_json_atomic(filepath, data):
         raise e
 
 
+def get_last_action():
+    """获取上次服务指令信息"""
+    if os.path.exists(LAST_ACTION_FILE):
+        try:
+            with open(LAST_ACTION_FILE, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                return data.get("last_action", "无动作")
+        except Exception:
+            pass
+    return "无动作"
+
+
+def set_last_action(action_str):
+    """保存上次服务指令信息"""
+    try:
+        save_json_atomic(LAST_ACTION_FILE, {"last_action": action_str})
+    except Exception as e:
+        print(f"[Error] 保存上次指令状态失败: {e}")
+
+
 # =====================
 # 路由接口
 # =====================
@@ -73,14 +95,13 @@ def api_config():
 def add_node():
     data = request.get_json(silent=True) or {}
     ip = str(data.get("ip", "")).strip()
-    name = str(data.get("name", ip)).strip()
+    name = str(data.get("name", "")).strip() or ip
 
     if not ip:
         return jsonify({"ok": False, "msg": "IP或域名不能为空"})
 
     cfg = load_config()
 
-    # 检查节点重复
     for n in cfg["nodes"]:
         if n.get("ip") == ip:
             return jsonify({"ok": False, "msg": "节点已存在"})
@@ -99,7 +120,6 @@ def delete_node():
     if not ip:
         return jsonify({"ok": False, "msg": "IP不能为空"})
 
-    # 1. 更新配置中的节点列表
     cfg = load_config()
     before_len = len(cfg["nodes"])
     cfg["nodes"] = [n for n in cfg["nodes"] if n.get("ip") != ip]
@@ -108,7 +128,6 @@ def delete_node():
     if deleted_count > 0:
         save_json_atomic(CONFIG_FILE, cfg)
 
-    # 2. 从状态文件中清除对应 IP
     if os.path.exists(STATUS_FILE):
         try:
             with open(STATUS_FILE, "r", encoding="utf-8") as f:
@@ -166,7 +185,6 @@ def status():
 
         cfg = load_config()
 
-        # 仅按配置文件的节点顺序过滤并返回
         result = [
             status_data[ip] 
             for n in cfg["nodes"] 
@@ -184,13 +202,26 @@ def logs():
         return jsonify([])
 
     try:
-        # 使用 deque 实现高性能高效读取最后 100 行
         with open(LOG_FILE, "r", encoding="utf-8", errors="ignore") as f:
             last_lines = list(deque(f, maxlen=100))
         return jsonify(last_lines)
     except Exception as e:
         print(f"[Error] 读取日志失败: {e}")
         return jsonify([])
+
+
+@app.route("/api/logs/clear", methods=["POST"])
+def clear_logs_file():
+    """彻底清空日志文件接口"""
+    if os.path.exists(LOG_FILE):
+        try:
+            with open(LOG_FILE, "w", encoding="utf-8") as f:
+                f.truncate(0)
+            return jsonify({"ok": True})
+        except Exception as e:
+            print(f"[Error] 清空日志文件失败: {e}")
+            return jsonify({"ok": False, "error": str(e)})
+    return jsonify({"ok": True})
 
 
 @app.route("/api/service/<action>")
@@ -200,7 +231,6 @@ def service(action):
         return jsonify({"ok": False, "msg": "非法的服务指令"})
 
     try:
-        # 执行 systemctl 动作
         result = subprocess.run(
             ["sudo", "systemctl", action, "pingmonitor"],
             timeout=10,
@@ -209,6 +239,10 @@ def service(action):
         )
 
         if result.returncode == 0:
+            action_map = {"start": "启动", "stop": "停止", "restart": "重启"}
+            action_name = action_map.get(action, action)
+            action_str = f"{time.strftime('%H:%M:%S')} ({action_name})"
+            set_last_action(action_str)
             return jsonify({"ok": True})
         else:
             return jsonify({"ok": False, "error": result.stderr.strip()})
@@ -221,12 +255,11 @@ def service(action):
 
 @app.route("/api/system")
 def system_info():
-    """获取真实的服务运行状态及运行时间（秒）"""
+    """获取真实的服务运行状态、运行时间（秒）以及上次指令"""
     running = False
     uptime_sec = 0
 
     try:
-        # 检查 pingmonitor 服务运行状态
         res = subprocess.run(
             ["systemctl", "is-active", "pingmonitor"],
             capture_output=True,
@@ -236,7 +269,6 @@ def system_info():
         running = (res.stdout.strip() == "active")
 
         if running:
-            # 获取服务启动时的单调时间戳
             res_mono = subprocess.run(
                 ["systemctl", "show", "pingmonitor", "--property=ActiveEnterTimestampMonotonic"],
                 capture_output=True,
@@ -259,9 +291,12 @@ def system_info():
         running = True
         uptime_sec = int(time.time() - APP_START_TIME)
 
-    return jsonify({"running": running, "uptime": uptime_sec})
+    return jsonify({
+        "running": running, 
+        "uptime": uptime_sec,
+        "last_action": get_last_action()
+    })
 
 
 if __name__ == "__main__":
-    # 生产环境中推荐使用 Gunicorn / UWSGI 部署，本地运行使用如下配置
     app.run(host="0.0.0.0", port=5000)
