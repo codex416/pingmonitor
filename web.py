@@ -24,8 +24,19 @@ app = Flask(__name__, template_folder="templates")
 
 
 # =====================
-# 工具函数（带原子写入）
+# 工具函数（带原子写入与日志记录）
 # =====================
+
+def write_log(msg):
+    """向日志文件写入带有时间戳的操作日志"""
+    try:
+        os.makedirs(os.path.dirname(LOG_FILE), exist_ok=True)
+        timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
+        with open(LOG_FILE, "a", encoding="utf-8") as f:
+            f.write(f"[{timestamp}] {msg}\n")
+    except Exception as e:
+        print(f"[Error] 写入日志失败: {e}")
+
 
 def load_config():
     """读取配置文件，带默认值防护"""
@@ -98,17 +109,20 @@ def add_node():
     name = str(data.get("name", "")).strip() or ip
 
     if not ip:
+        write_log("添加节点失败: IP或域名不能为空")
         return jsonify({"ok": False, "msg": "IP或域名不能为空"})
 
     cfg = load_config()
 
     for n in cfg["nodes"]:
         if n.get("ip") == ip:
+            write_log(f"添加节点失败: 节点 [{ip}] 已存在")
             return jsonify({"ok": False, "msg": "节点已存在"})
 
     cfg["nodes"].append({"name": name, "ip": ip})
     save_json_atomic(CONFIG_FILE, cfg)
-
+    
+    write_log(f"添加节点成功: 名称=[{name}], IP/域名=[{ip}]")
     return jsonify({"ok": True})
 
 
@@ -118,6 +132,7 @@ def delete_node():
     ip = str(data.get("ip", "")).strip()
 
     if not ip:
+        write_log("删除节点失败: IP不能为空")
         return jsonify({"ok": False, "msg": "IP不能为空"})
 
     cfg = load_config()
@@ -139,6 +154,7 @@ def delete_node():
         except Exception as e:
             print(f"[Warning] 删除状态节点失败: {e}")
 
+    write_log(f"删除节点成功: IP/域名=[{ip}]")
     return jsonify({"ok": True, "deleted": deleted_count})
 
 
@@ -151,6 +167,7 @@ def worker():
     cfg["worker"] = worker_url
     save_json_atomic(CONFIG_FILE, cfg)
 
+    write_log(f"更新 Telegram Worker 配置: URL=[{worker_url}]")
     return jsonify({"ok": True})
 
 
@@ -171,6 +188,7 @@ def interval():
     cfg["interval"] = value
     save_json_atomic(CONFIG_FILE, cfg)
 
+    write_log(f"更新检测频率: [{value}] 秒")
     return jsonify({"ok": True, "interval": value})
 
 
@@ -213,22 +231,26 @@ def logs():
 @app.route("/api/logs/clear", methods=["POST"])
 def clear_logs_file():
     """彻底清空日志文件接口"""
-    if os.path.exists(LOG_FILE):
-        try:
-            with open(LOG_FILE, "w", encoding="utf-8") as f:
-                f.truncate(0)
-            return jsonify({"ok": True})
-        except Exception as e:
-            print(f"[Error] 清空日志文件失败: {e}")
-            return jsonify({"ok": False, "error": str(e)})
-    return jsonify({"ok": True})
+    try:
+        os.makedirs(os.path.dirname(LOG_FILE), exist_ok=True)
+        with open(LOG_FILE, "w", encoding="utf-8") as f:
+            f.truncate(0)
+        write_log("系统终端日志已被清空并重新初始化")
+        return jsonify({"ok": True})
+    except Exception as e:
+        print(f"[Error] 清空日志文件失败: {e}")
+        return jsonify({"ok": False, "error": str(e)})
 
 
 @app.route("/api/service/<action>")
 def service(action):
     allowed_actions = {"start", "stop", "restart"}
     if action not in allowed_actions:
+        write_log(f"非法服务操作指令: [{action}]")
         return jsonify({"ok": False, "msg": "非法的服务指令"})
+
+    action_map = {"start": "启动", "stop": "停止", "restart": "重启"}
+    action_name = action_map.get(action, action)
 
     try:
         result = subprocess.run(
@@ -239,17 +261,20 @@ def service(action):
         )
 
         if result.returncode == 0:
-            action_map = {"start": "启动", "stop": "停止", "restart": "重启"}
-            action_name = action_map.get(action, action)
             action_str = f"{time.strftime('%H:%M:%S')} ({action_name})"
             set_last_action(action_str)
+            write_log(f"发送服务指令成功: [{action_name}]")
             return jsonify({"ok": True})
         else:
-            return jsonify({"ok": False, "error": result.stderr.strip()})
+            err_msg = result.stderr.strip()
+            write_log(f"发送服务指令失败: [{action_name}], 错误原因: {err_msg}")
+            return jsonify({"ok": False, "error": err_msg})
 
     except subprocess.TimeoutExpired:
+        write_log(f"发送服务指令超时: [{action_name}]")
         return jsonify({"ok": False, "error": "指令执行超时"})
     except Exception as e:
+        write_log(f"发送服务指令异常: [{action_name}], 详情: {str(e)}")
         return jsonify({"ok": False, "error": str(e)})
 
 
