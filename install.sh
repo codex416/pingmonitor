@@ -31,11 +31,13 @@ pip3 install flask requests
 
 
 
-echo "创建目录"
+echo "创建目录与初始化日志文件"
 
 
 mkdir -p $APP_DIR/templates
 mkdir -p $APP_DIR/logs
+touch $APP_DIR/logs/monitor.log
+chmod 666 $APP_DIR/logs/monitor.log
 
 
 
@@ -79,6 +81,8 @@ www-data ALL=(ALL) NOPASSWD: /bin/systemctl restart pingmonitor
 
 www-data ALL=(ALL) NOPASSWD: /usr/bin/truncate
 
+www-data ALL=(ALL) NOPASSWD: /bin/chmod
+
 EOF
 
 
@@ -94,6 +98,7 @@ echo "设置文件权限"
 
 chown -R www-data:www-data $APP_DIR
 chmod -R 777 $APP_DIR/logs
+chmod 666 $APP_DIR/logs/monitor.log
 
 
 
