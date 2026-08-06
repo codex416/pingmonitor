@@ -2,335 +2,747 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
-<!-- 针对手机浏览器增加的视口适配 -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>PingMonitor</title>
+<title>PingMonitor Dashboard</title>
 
 <style>
 *{box-sizing:border-box}
-body{
-font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Microsoft YaHei",Arial,sans-serif;
-background:#f5f8ff;
-margin:0;
-color:#1f2937;
-}
-h1{
-margin:0;
-padding:22px 30px;
-font-size:28px;
-color:#1769ff;
-background:linear-gradient(135deg,#eef5ff,#dceaff);
-border-bottom:1px solid #dbe7ff;
-}
-.box{
-background:#fff;
-margin:25px 30px;
-padding:22px;
-border-radius:14px;
-border:1px solid #e5edff;
-box-shadow:0 8px 25px rgba(30,90,180,.08);
-}
-.box h3{
-margin-top:0;
-color:#1264e8;
-font-size:18px;
-}
-table{
-width:100%;
-border-collapse:collapse;
-}
-th{
-background:#f6f9ff;
-color:#52627a;
-}
-th,td{
-padding:13px 10px;
-border-bottom:1px solid #edf1f7;
-text-align:center;
-}
-.online{color:#16a34a;font-weight:bold}
-.offline{color:#ef4444;font-weight:bold}
-.checking{color:#2563eb;font-weight:bold}
-input{
-height:40px;
-padding:0 14px;
-margin:5px;
-border-radius:8px;
-border:1px solid #d8e2f2;
-}
-button{
-height:40px;
-padding:0 22px;
-border-radius:8px;
-border:0;
-cursor:pointer;
-background:linear-gradient(135deg,#2878ff,#1760df);
-color:#fff;
-}
-button[onclick^="delNode"]{
-background:#fff;
-color:#ef4444;
-border:1px solid #fecaca;
-}
-button[onclick="service('stop')"]{
-background:#ef4444;
-}
-button[onclick="service('restart')"]{
-background:#fff;
-color:#1769ff;
-border:1px solid #9dc3ff;
-}
-#logs{
-background:#111827;
-color:#22c55e;
-height:300px;
-overflow:auto;
-padding:15px;
-border-radius:10px;
-font-family:Consolas,monospace;
+
+:root {
+  --bg-main: #f1f5f9;
+  --primary: #2563eb;
+  --primary-hover: #1d4ed8;
+  --text-main: #0f172a;
+  --text-muted: #64748b;
+  --card-bg: #ffffff;
+  --card-border: #e2e8f0;
 }
 
-/* 移动端专属响应式样式 */
-@media(max-width:768px){
-h1{
-padding:18px;
-font-size:22px;
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  background-color: var(--bg-main);
+  background-image: radial-gradient(#cbd5e1 1px, transparent 1px);
+  background-size: 24px 24px;
+  margin: 0;
+  color: var(--text-main);
+  padding-bottom: 40px;
 }
-.box{
-margin:15px;
-padding:16px;
+
+/* 顶部栏圆角卡片化设计 */
+header {
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 16px;
+  max-width: 1400px;
+  margin: 20px auto 0;
+  padding: 20px 24px;
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.03);
 }
-table{
-display:block;
-overflow-x:auto;
-white-space:nowrap;
+
+.header-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
 }
-input{
-width:100% !important;
-margin:6px 0;
+
+h1 {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 700;
+  color: #1e293b;
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
-button{
-width:100%;
-margin-top:8px;
+
+h1::before {
+  content: '';
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  background: #22c55e;
+  border-radius: 50%;
+  box-shadow: 0 0 10px #22c55e;
 }
-#logs{
-height:240px;
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 16px;
 }
+
+.stat-card {
+  background: #f8fafc;
+  padding: 12px 16px;
+  border-radius: 12px;
+  border: 1px solid var(--card-border);
+}
+
+.stat-label {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.stat-value {
+  font-size: 20px;
+  font-weight: 700;
+  margin-top: 4px;
+  color: var(--text-main);
+}
+
+.dashboard-grid {
+  max-width: 1400px;
+  margin: 20px auto;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  gap: 20px;
+}
+
+.col-12 { grid-column: span 12; }
+.col-8  { grid-column: span 8; }
+.col-6  { grid-column: span 6; }
+.col-4  { grid-column: span 4; }
+
+.box {
+  background: var(--card-bg);
+  padding: 20px 24px;
+  border-radius: 16px;
+  border: 1px solid var(--card-border);
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.03);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.box-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.box h3 {
+  margin: 0;
+  color: #1e293b;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.box h4 {
+  margin-top: 20px;
+  margin-bottom: 12px;
+  color: var(--text-muted);
+  font-size: 13px;
+  text-transform: uppercase;
+}
+
+.form-row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  width: 100%;
+}
+
+/* 表格样式 */
+.table-wrapper {
+  width: 100%;
+  overflow-x: auto;
+  border-radius: 10px;
+  border: 1px solid var(--card-border);
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  white-space: nowrap;
+}
+
+th {
+  background: #f8fafc;
+  color: var(--text-muted);
+  font-weight: 600;
+  font-size: 13px;
+}
+
+th, td {
+  padding: 12px 16px;
+  border-bottom: 1px solid #f1f5f9;
+  text-align: center;
+  font-size: 14px;
+}
+
+tbody tr:hover {
+  background-color: #f8fafc;
+}
+
+tr:last-child td { border-bottom: none; }
+
+/* 状态与延迟样式 */
+.online, .offline, .checking {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.online { background-color: #dcfce7; color: #15803d; }
+.offline { background-color: #fee2e2; color: #b91c1c; }
+.checking { background-color: #dbeafe; color: #1d4ed8; }
+
+.delay-good { color: #16a34a; font-weight: 600; }
+.delay-medium { color: #d97706; font-weight: 600; }
+.delay-bad { color: #dc2626; font-weight: 700; }
+
+.checking::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  background: #2563eb;
+  border-radius: 50%;
+  animation: pulse 1s infinite alternate;
+}
+
+@keyframes pulse {
+  from { opacity: 0.3; }
+  to { opacity: 1; }
+}
+
+/* 全局控件规范 */
+input {
+  width: 100%;
+  height: 42px !important;
+  line-height: 42px;
+  padding: 0 14px !important;
+  border-radius: 8px;
+  border: 1px solid #cbd5e1;
+  background-color: #f8fafc;
+  outline: none;
+  font-size: 14px;
+  transition: all 0.2s;
+  margin: 0;
+}
+
+input:focus {
+  background-color: #fff;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+}
+
+button {
+  height: 42px !important;
+  line-height: 42px;
+  padding: 0 20px !important;
+  border-radius: 8px;
+  border: 0;
+  cursor: pointer;
+  background: var(--primary);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  transition: all 0.2s;
+  box-shadow: 0 2px 4px rgba(37, 99, 235, 0.15);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+button:hover {
+  background: var(--primary-hover);
+  transform: translateY(-1px);
+}
+
+button:active { transform: translateY(0); }
+
+button.btn-danger { background: #ef4444; }
+button.btn-danger:hover { background: #dc2626; }
+
+button.btn-outline-danger {
+  background: #fff;
+  color: #ef4444;
+  border: 1px solid #fca5a5;
+  box-shadow: none;
+  height: 36px !important;
+  line-height: 36px;
+  padding: 0 12px !important;
+  font-size: 13px;
+}
+button.btn-outline-danger:hover { background: #fef2f2; }
+
+button.btn-outline-primary {
+  background: #fff;
+  color: var(--primary);
+  border: 1px solid #93c5fd;
+  box-shadow: none;
+}
+button.btn-outline-primary:hover { background: #eff6ff; }
+
+/* 终端面板 */
+.terminal-bar {
+  display: flex;
+  align-items: center;
+  background: #1e293b;
+  padding: 10px 14px;
+  border-top-left-radius: 10px;
+  border-top-right-radius: 10px;
+}
+
+.terminal-dots {
+  display: flex;
+  gap: 6px;
+}
+
+.dot { width: 10px; height: 10px; border-radius: 50%; }
+.dot-red { background: #ef4444; }
+.dot-yellow { background: #f59e0b; }
+.dot-green { background: #10b981; }
+
+#logs {
+  background: #0f172a;
+  color: #4ade80;
+  height: 260px;
+  overflow: auto;
+  padding: 14px;
+  border-bottom-left-radius: 10px;
+  border-bottom-right-radius: 10px;
+  font-family: "JetBrains Mono", Consolas, Monaco, monospace;
+  font-size: 12px;
+  line-height: 1.6;
+  word-break: break-all;
+}
+
+#toast {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  padding: 12px 20px;
+  background: #0f172a;
+  color: #fff;
+  border-radius: 8px;
+  font-size: 14px;
+  box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+  transform: translateY(100px);
+  opacity: 0;
+  transition: all 0.3s cubic-bezier(0.68, -0.55, 0.27, 1.55);
+  z-index: 1000;
+}
+
+#toast.show {
+  transform: translateY(0);
+  opacity: 1;
+}
+
+@media(max-width: 1440px) {
+  header, .dashboard-grid { margin-left: 20px; margin-right: 20px; }
+}
+
+@media(max-width: 1024px) {
+  .col-8, .col-6, .col-4 { grid-column: span 12; }
+}
+
+@media(max-width: 768px) {
+  header { margin: 12px 12px 0; padding: 16px; border-radius: 12px; }
+  .dashboard-grid { margin: 12px 12px 20px; gap: 12px; }
+  .box { padding: 16px; border-radius: 12px; }
+  .form-row { flex-direction: column; align-items: stretch; }
+  input, button { width: 100% !important; }
 }
 </style>
 </head>
 
 <body>
 
-<h1>PingMonitor</h1>
+<header>
+  <div class="header-title">
+    <h1>PingMonitor</h1>
+    <span style="font-size: 12px; color: var(--text-muted);" id="last-update">最后更新: --:--:--</span>
+  </div>
 
-<div class="box">
-<h3>监控节点</h3>
+  <div class="stats-grid">
+    <div class="stat-card">
+      <div class="stat-label">总监控节点</div>
+      <div class="stat-value" id="stat-total">0</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">在线节点</div>
+      <div class="stat-value" style="color: #16a34a;" id="stat-online">0</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">异常节点</div>
+      <div class="stat-value" style="color: #dc2626;" id="stat-offline">0</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">平均延迟</div>
+      <div class="stat-value" style="color: #2563eb;" id="stat-delay">-- ms</div>
+    </div>
+  </div>
+</header>
 
-<table>
-<thead>
-<tr>
-<th>名称</th>
-<th>IP</th>
-<th>状态</th>
-<th>延迟</th>
-<th>最后检测</th>
-<th>失败次数</th>
-<th>操作</th>
-</tr>
-</thead>
+<main class="dashboard-grid">
 
-<tbody id="nodes"></tbody>
-</table>
+  <div class="box col-12">
+    <div class="box-header">
+      <h3>监控节点列表</h3>
+    </div>
 
-<h4>添加节点</h4>
-<input id="name" placeholder="节点名称">
-<input id="ip" placeholder="IP地址">
-<button onclick="addNode()">添加</button>
-</div>
+    <div class="table-wrapper">
+      <table>
+        <thead>
+          <tr>
+            <th>名称</th>
+            <th>IP / 域名</th>
+            <th>状态</th>
+            <th>延迟</th>
+            <th>最后检测</th>
+            <th>失败次数</th>
+            <th>操作</th>
+          </tr>
+        </thead>
+        <tbody id="nodes"></tbody>
+      </table>
+    </div>
 
+    <h4>添加新监控节点</h4>
+    <div class="form-row">
+      <div style="flex: 1;"><input id="name" placeholder="节点名称（例如: 香港服务器）"></div>
+      <div style="flex: 1;"><input id="ip" placeholder="IP 地址或域名"></div>
+      <button onclick="addNode()">添加节点</button>
+    </div>
+  </div>
 
-<div class="box">
-<h3>Telegram Worker</h3>
-<input id="worker" style="width:400px">
-<button onclick="saveWorker()">保存</button>
-</div>
+  <div class="box col-6">
+    <div class="box-header">
+      <h3>Telegram Worker</h3>
+    </div>
+    <div class="form-row">
+      <div style="flex: 1;"><input id="worker" placeholder="https://your-worker.workers.dev"></div>
+      <button onclick="saveWorker()">保存配置</button>
+    </div>
+  </div>
 
+  <div class="box col-6">
+    <div class="box-header">
+      <h3>检测频率</h3>
+    </div>
+    <div class="form-row">
+      <div style="flex: 1; position: relative; display: flex; align-items: center;">
+        <input id="interval" type="number" min="5" placeholder="60" style="padding-right: 35px !important;">
+        <span style="position: absolute; right: 12px; font-size: 13px; color: var(--text-muted); pointer-events: none;">秒</span>
+      </div>
+      <button onclick="saveInterval()">保存间隔</button>
+    </div>
+  </div>
 
-<div class="box">
-<h3>检测间隔</h3>
-<input id="interval" type="number">
-秒
-<button onclick="saveInterval()">保存</button>
-</div>
+  <!-- 实时日志：居左 (占 8 列) -->
+  <div class="box col-8">
+    <div class="box-header">
+      <h3>实时系统日志</h3>
+    </div>
+    
+    <div>
+      <div class="terminal-bar">
+        <div class="terminal-dots">
+          <div class="dot dot-red"></div>
+          <div class="dot dot-yellow"></div>
+          <div class="dot dot-green"></div>
+        </div>
+      </div>
+      <div id="logs">加载日志中...</div>
+    </div>
+  </div>
 
+  <!-- 服务控制：居右 (占 4 列) -->
+  <div class="box col-4">
+    <div>
+      <div class="box-header">
+        <h3>服务控制</h3>
+        <span class="online" id="service-status-badge">运行中</span>
+      </div>
 
-<div class="box">
-<h3>服务控制</h3>
-<button onclick="service('start')">启动</button>
-<button onclick="service('stop')">停止</button>
-<button onclick="service('restart')">重启</button>
-</div>
+      <!-- 服务核心指标卡片 -->
+      <div style="background: #f8fafc; border: 1px solid var(--card-border); border-radius: 10px; padding: 12px 14px; margin-bottom: 16px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; font-size: 13px; margin-bottom: 8px;">
+          <span style="color: var(--text-muted);">运行时间</span>
+          <span style="font-weight: 600;" id="service-uptime">已连续运行</span>
+        </div>
+        <div style="display: flex; justify-content: space-between; align-items: center; font-size: 13px;">
+          <span style="color: var(--text-muted);">上次指令</span>
+          <span style="font-size: 12px; color: var(--text-muted);" id="last-action-time">无动作</span>
+        </div>
+      </div>
+    </div>
 
+    <!-- 操作按钮组 -->
+    <div>
+      <div class="form-row" style="margin-bottom: 10px;">
+        <button style="flex: 1;" onclick="service('start')">启动</button>
+        <button style="flex: 1;" class="btn-danger" onclick="service('stop')">停止</button>
+        <button style="flex: 1;" class="btn-outline-primary" onclick="service('restart')">重启</button>
+      </div>
+      
+      <button class="btn-danger" style="width: 100%;" onclick="clearLogs()">
+        清空系统终端日志
+      </button>
+    </div>
+  </div>
 
-<div class="box">
-<h3>实时日志</h3>
-<div id="logs">加载中...</div>
-</div>
+</main>
 
+<div id="toast">提示信息</div>
 
 <script>
+function showToast(msg) {
+    let t = document.getElementById("toast");
+    t.innerText = msg;
+    t.classList.add("show");
+    setTimeout(() => { t.classList.remove("show"); }, 3000);
+}
+
 async function loadConfig(){
-    let r = await fetch("/api/config");
-    let c = await r.json();
+    try {
+        let r = await fetch("/api/config");
+        if(!r.ok) throw new Error("配置文件加载失败");
+        let c = await r.json();
 
-    document.getElementById("worker").value = c.worker || "";
-    document.getElementById("interval").value = c.interval || 60;
-
-    return c;
+        document.getElementById("worker").value = c.worker || "";
+        document.getElementById("interval").value = c.interval || 60;
+        return c;
+    } catch(e) {
+        console.error(e);
+        return { nodes: [] };
+    }
 }
 
 async function loadStatus(){
-    let config = await loadConfig();
-    let r = await fetch("/api/status");
-    let status = await r.json();
+    try {
+        let config = await loadConfig();
+        let r = await fetch("/api/status");
+        if(!r.ok) throw new Error("状态加载失败");
+        let status = await r.json();
 
-    let map={};
-    status.forEach(n=>{
-        map[n.ip]=n;
-    });
+        let map = {};
+        (status || []).forEach(n => { map[n.ip] = n; });
 
-    let data=[];
-    config.nodes.forEach(n=>{
-        if(map[n.ip]){
-            data.push(map[n.ip]);
-        }else{
-            data.push({
-                name:n.name,
-                ip:n.ip,
-                status:"检测中",
-                delay:"-",
-                last:"-",
-                fail:0
-            });
-        }
-    });
+        let data = [];
+        let totalOnline = 0, totalOffline = 0, totalDelay = 0, delayCount = 0;
 
-    let html="";
-    data.forEach(n=>{
-        let cls="checking";
-        if(n.status=="在线"){
-            cls="online";
-        }
-        if(n.status=="离线"){
-            cls="offline";
-        }
+        (config.nodes || []).forEach(n => {
+            let item = map[n.ip] || {
+                name: n.name,
+                ip: n.ip,
+                status: "检测中",
+                delay: "-",
+                last: "-",
+                fail: 0
+            };
 
-        html += `
-        <tr>
-            <td>${n.name}</td>
-            <td>${n.ip}</td>
-            <td class="${cls}">${n.status}</td>
-            <td>${n.delay}</td>
-            <td>${n.last}</td>
-            <td>${n.fail}</td>
-            <td>
-                <button onclick="delNode('${n.ip}')">删除</button>
-            </td>
-        </tr>
-        `;
-    });
+            if(item.status === "在线") totalOnline++;
+            if(item.status === "离线") totalOffline++;
+            
+            let numericDelay = parseInt(item.delay);
+            if(!isNaN(numericDelay)) {
+                totalDelay += numericDelay;
+                delayCount++;
+            }
 
-    document.getElementById("nodes").innerHTML = html;
+            data.push(item);
+        });
+
+        document.getElementById("stat-total").innerText = data.length;
+        document.getElementById("stat-online").innerText = totalOnline;
+        document.getElementById("stat-offline").innerText = totalOffline;
+        document.getElementById("stat-delay").innerText = delayCount > 0 ? Math.round(totalDelay / delayCount) + " ms" : "-- ms";
+        document.getElementById("last-update").innerText = "最后更新: " + new Date().toLocaleTimeString();
+
+        let html = "";
+        data.forEach(n => {
+            let cls = "checking";
+            if(n.status === "在线") cls = "online";
+            if(n.status === "离线") cls = "offline";
+
+            let delayStyle = "";
+            let numericDelay = parseInt(n.delay);
+            if(!isNaN(numericDelay)) {
+                if(numericDelay < 150) delayStyle = 'class="delay-good"';
+                else if(numericDelay < 400) delayStyle = 'class="delay-medium"';
+                else delayStyle = 'class="delay-bad"';
+            }
+
+            html += `
+            <tr>
+                <td style="font-weight: 500;">${escapeHtml(n.name || '-')}</td>
+                <td><code style="background:#f1f5f9; padding:2px 6px; border-radius:4px; cursor:pointer;" title="点击复制" onclick="copyText('${escapeHtml(n.ip)}')">${escapeHtml(n.ip)}</code></td>
+                <td><span class="${cls}">${escapeHtml(n.status)}</span></td>
+                <td ${delayStyle}>${escapeHtml(String(n.delay))}</td>
+                <td style="color: var(--text-muted); font-size: 13px;">${escapeHtml(String(n.last))}</td>
+                <td>${n.fail > 0 ? `<span style="color:#ef4444; font-weight:bold;">${n.fail}</span>` : 0}</td>
+                <td>
+                    <button class="btn-outline-danger" onclick="delNode('${escapeHtml(n.ip)}')">删除</button>
+                </td>
+            </tr>
+            `;
+        });
+
+        document.getElementById("nodes").innerHTML = html || '<tr><td colspan="7" style="color:var(--text-muted); padding:20px;">暂无监控节点，请在下方添加</td></tr>';
+    } catch(e) {
+        console.error(e);
+    }
+}
+
+function copyText(text) {
+    navigator.clipboard.writeText(text);
+    showToast(`已复制: ${text}`);
 }
 
 async function addNode(){
-    let name = document.getElementById("name").value;
-    let ip = document.getElementById("ip").value;
+    let name = document.getElementById("name").value.trim();
+    let ip = document.getElementById("ip").value.trim();
 
     if(!ip){
-        alert("请输入IP");
+        showToast("请输入有效的 IP 地址或域名");
         return;
     }
 
-    await fetch("/api/add",{
-        method:"POST",
-        headers:{
-            "Content-Type":"application/json"
-        },
-        body:JSON.stringify({
-            name:name,
-            ip:ip
-        })
-    });
+    try {
+        await fetch("/api/add",{
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ name, ip })
+        });
 
-    document.getElementById("name").value="";
-    document.getElementById("ip").value="";
-
-    loadStatus();
+        document.getElementById("name").value = "";
+        document.getElementById("ip").value = "";
+        showToast("节点添加成功");
+        await loadStatus();
+    } catch(e) {
+        showToast("添加失败，请检查网络");
+    }
 }
 
 async function delNode(ip){
-    await fetch("/api/delete",{
-        method:"POST",
-        headers:{
-            "Content-Type":"application/json"
-        },
-        body:JSON.stringify({
-            ip:ip
-        })
-    });
+    if(!confirm(`确定要删除节点 [${ip}] 吗？`)) return;
 
-    setTimeout(loadStatus,500);
+    try {
+        await fetch("/api/delete",{
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ ip })
+        });
+        showToast("节点已删除");
+        await loadStatus();
+    } catch(e) {
+        showToast("删除失败");
+    }
 }
 
 async function saveWorker(){
-    await fetch("/api/worker",{
-        method:"POST",
-        headers:{
-            "Content-Type":"application/json"
-        },
-        body:JSON.stringify({
-            worker: document.getElementById("worker").value
-        })
-    });
-
-    alert("保存成功");
+    let worker = document.getElementById("worker").value.trim();
+    try {
+        await fetch("/api/worker",{
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ worker })
+        });
+        showToast("Telegram Worker 已保存");
+    } catch(e) {
+        showToast("保存失败");
+    }
 }
 
 async function saveInterval(){
-    await fetch("/api/interval",{
-        method:"POST",
-        headers:{
-            "Content-Type":"application/json"
-        },
-        body:JSON.stringify({
-            interval: document.getElementById("interval").value
-        })
-    });
+    let interval = document.getElementById("interval").value;
+    if(!interval || interval < 5) {
+        showToast("间隔时间不能小于 5 秒");
+        return;
+    }
 
-    alert("检测间隔已修改");
+    try {
+        await fetch("/api/interval",{
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ interval })
+        });
+        showToast("检测间隔已更新");
+    } catch(e) {
+        showToast("保存失败");
+    }
 }
 
 async function service(a){
-    await fetch("/api/service/"+a);
-    alert("执行完成");
+    try {
+        await fetch("/api/service/" + a);
+        let actionMap = { start: '启动', stop: '停止', restart: '重启' };
+        let actionName = actionMap[a] || a;
+        document.getElementById("last-action-time").innerText = new Date().toLocaleTimeString() + ` (${actionName})`;
+        showToast(`服务${actionName}指令已发送`);
+    } catch(e) {
+        showToast("指令发送失败");
+    }
+}
+
+function clearLogs(){
+    document.getElementById("logs").innerHTML = "日志已被清空。";
+    showToast("系统终端日志已清空");
 }
 
 async function loadLogs(){
-    let r = await fetch("/api/logs");
-    let data = await r.json();
+    try {
+        let r = await fetch("/api/logs");
+        if(!r.ok) return;
+        let data = await r.json();
 
-    let box = document.getElementById("logs");
-    box.innerHTML = data.join("<br>");
-    box.scrollTop = box.scrollHeight;
+        let box = document.getElementById("logs");
+        box.innerHTML = data.map(line => escapeHtml(line)).join("<br>");
+        box.scrollTop = box.scrollHeight;
+    } catch(e) {
+        console.error(e);
+    }
+}
+
+function escapeHtml(str) {
+    if (!str) return '';
+    return String(str)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
 }
 
 loadStatus();
 loadLogs();
 
-setInterval(loadStatus,5000);
-setInterval(loadLogs,5000);
+let timerStatus, timerLogs;
+
+function startPolling() {
+    stopPolling();
+    timerStatus = setInterval(loadStatus, 5000);
+    timerLogs = setInterval(loadLogs, 5000);
+}
+
+function stopPolling() {
+    clearInterval(timerStatus);
+    clearInterval(timerLogs);
+}
+
+startPolling();
+
+document.addEventListener("visibilitychange", () => {
+    if (document.hidden) {
+        stopPolling();
+    } else {
+        loadStatus();
+        loadLogs();
+        startPolling();
+    }
+});
 </script>
 
 </body>
