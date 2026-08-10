@@ -26,20 +26,15 @@
     width: 100%;
   }
   .main-wrapper { max-width: 1320px; margin: 0 auto; padding: 0 20px calc(80px + env(safe-area-inset-bottom)); background-color: var(--ios-bg); }
-  .ios-large-header { padding-top: calc(env(safe-area-inset-top) + 20px); padding-bottom: 12px; }
+  .ios-large-header { padding-top: calc(env(safe-area-inset-top) + 20px); padding-bottom: 12px; cursor: pointer; user-select: none; }
   .large-title { font-size: 32px; font-weight: 800; letter-spacing: -0.6px; color: var(--text-main); line-height: 1.1; }
   .header-sub-row { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
   .status-dot { width: 8px; height: 8px; border-radius: 50%; background-color: var(--ios-green); display: inline-block; flex-shrink: 0; transition: background-color 0.3s ease; }
   .last-update-text { font-size: 13px; color: var(--text-muted); font-weight: 400; }
   
-  /* 基础区块标题：默认移动端间距 */
+  /* 基础区块标题 */
   .group-title { font-size: 13px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: -0.1px; margin: 24px 2px 12px; }
-  
-  /* 针对你指定的三个标题：在移动端和桌面端都统一加大上方间距，使其完美下沉到两张卡片正中间 */
-  .group-title.middle-title {
-    margin-top: 36px !important;
-    margin-bottom: 12px !important;
-  }
+  .group-title.middle-title { margin-top: 36px !important; margin-bottom: 12px !important; }
   
   .widget-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
   @media (min-width: 768px) { .widget-grid { grid-template-columns: repeat(4, 1fr); gap: 16px; } }
@@ -72,7 +67,6 @@
   .del-btn { background: rgba(255,59,48,0.1); color: var(--ios-red); border: none; height: 30px; padding: 0 14px; font-size: 12px; font-weight: 600; border-radius: 6px; cursor: pointer; white-space: nowrap; transition: background 0.2s; }
   .del-btn:hover { background: rgba(255,59,48,0.2); }
 
-  /* 响应式空状态文案显隐逻辑 */
   .empty-pc { display: none; }
   .empty-mobile { display: inline; }
   @media (min-width: 992px) {
@@ -105,17 +99,31 @@
       transition: opacity 0.3s ease, visibility 0.3s ease; z-index: 900;
     }
     .drawer-overlay.open { opacity: 1 !important; visibility: visible !important; pointer-events: auto !important; }
+    
     .bottom-drawer {
       position: fixed; left: 0; right: 0; bottom: 0;
       height: calc(100vh - env(safe-area-inset-top) - 10px); height: calc(100dvh - env(safe-area-inset-top) - 10px);
       max-height: 720px; background: #f2f2f7; border-top-left-radius: 20px; border-top-right-radius: 20px;
       box-shadow: 0 -6px 25px rgba(0,0,0,0.12); z-index: 1000;
-      transform: translate3d(0, calc(100% - 64px), 0); will-change: transform;
-      transition: transform 0.32s cubic-bezier(0.16, 1, 0.3, 1); display: flex; flex-direction: column;
+      /* 默认完全隐藏并禁用点击交互 */
+      transform: translate3d(0, 100%, 0);
+      visibility: hidden;
+      pointer-events: none;
+      will-change: transform;
+      transition: transform 0.32s cubic-bezier(0.16, 1, 0.3, 1), visibility 0.32s;
+      display: flex; flex-direction: column;
       touch-action: none;
     }
-    .bottom-drawer.open { transform: translate3d(0, 0, 0) !important; }
-    .bottom-drawer.closed { transform: translate3d(0, calc(100% - 64px), 0) !important; }
+    .bottom-drawer.open {
+      transform: translate3d(0, 0, 0) !important;
+      visibility: visible !important;
+      pointer-events: auto !important;
+    }
+    .bottom-drawer.closed {
+      transform: translate3d(0, 100%, 0) !important;
+      visibility: hidden !important;
+      pointer-events: none !important;
+    }
     .bottom-drawer.dragging { transition: none !important; }
     .drawer-header-area { flex-shrink: 0; cursor: grab; user-select: none; padding-bottom: 4px; background: #f2f2f7; border-top-left-radius: 20px; border-top-right-radius: 20px; }
     .drawer-header { height: 22px; display: flex; align-items: center; justify-content: center; }
@@ -126,7 +134,7 @@
   }
   @media (min-width: 992px) {
     .drawer-overlay { display: none !important; }
-    .bottom-drawer { position: static !important; transform: none !important; background: transparent !important; box-shadow: none !important; height: auto !important; max-height: none !important; z-index: 1 !important; display: flex; flex-direction: column; }
+    .bottom-drawer { position: static !important; transform: none !important; visibility: visible !important; pointer-events: auto !important; background: transparent !important; box-shadow: none !important; height: auto !important; max-height: none !important; z-index: 1 !important; display: flex; flex-direction: column; }
     .drawer-header-area { display: none !important; }
     .dashboard-grid { display: grid; grid-template-columns: 1fr 380px; gap: 24px; align-items: stretch; margin-top: 10px; }
     .main-section { grid-column: 1; display: flex; flex-direction: column; }
@@ -150,7 +158,8 @@
 <body>
 
 <div class="main-wrapper" id="main-content">
-  <div class="ios-large-header">
+  <!-- 点击顶部主标题可触发移动端控制台抽屉的展开/收起 -->
+  <div class="ios-large-header" onclick="toggleDrawer()" title="点击打开控制面板">
     <div class="large-title">PingMonitor</div>
     <div class="header-sub-row">
       <span class="status-dot" id="header-dot"></span>
@@ -185,7 +194,8 @@
       </div>
     </div>
 
-    <div class="bottom-drawer" id="drawer">
+    <!-- 移动端默认带有 closed 类，配合 CSS 的 visibility:hidden 完全隐藏 -->
+    <div class="bottom-drawer closed" id="drawer">
       <div class="drawer-header-area" id="drawer-header-area" onclick="toggleDrawer()">
         <div class="drawer-header"><div class="drawer-pill"></div></div>
         <div class="drawer-title-bar"><div class="drawer-title">控制台与管理设置</div></div>
@@ -369,7 +379,7 @@ async function refreshDashboard(isInitial = false) {
 
         const container = $("nodes-container");
         if (nodes.length === 0) {
-            container.innerHTML = '<div class="ios-card" style="padding: 24px; text-align: center; color: var(--text-muted); font-size: 14px;"><span class="empty-pc">暂无监控节点，请在右侧添加</span><span class="empty-mobile">暂无监控节点，请在下方添加</span></div>';
+            container.innerHTML = '<div class="ios-card" style="padding: 24px; text-align: center; color: var(--text-muted); font-size: 14px;"><span class="empty-pc">暂无监控节点，请在右侧添加</span><span class="empty-mobile">暂无监控节点，点击标题打开控制台添加</span></div>';
             lastRenderedHTML = "";
         } else {
             const finalHTML = '<div class="node-cards-grid">' + htmlParts.join('') + '</div>';
