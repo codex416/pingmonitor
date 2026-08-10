@@ -68,11 +68,14 @@
   .ios-btn { height: 40px; border-radius: 8px; border: none; background: var(--ios-blue); color: #ffffff; font-size: 14px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; }
   .ios-btn-secondary { background: #e5e5ea; color: var(--ios-blue); }
   .ios-btn-danger { background: rgba(255,59,48,0.12); color: var(--ios-red); }
-  .terminal-card { background: #1c1c1e; border-radius: var(--card-radius); padding: 14px 18px; display: flex; flex-direction: column; box-shadow: 0 2px 8px rgba(0,0,0,0.03); flex: 1; min-height: 180px; }
+  
+  /* 终端固定高度并允许内部滚动，避免无限拉长 */
+  .terminal-card { background: #1c1c1e; border-radius: var(--card-radius); padding: 14px 18px; display: flex; flex-direction: column; box-shadow: 0 2px 8px rgba(0,0,0,0.03); height: 260px; flex-shrink: 0; }
   .terminal-header { display: flex; align-items: center; justify-content: space-between; padding-bottom: 8px; margin-bottom: 8px; border-bottom: 0.5px solid rgba(255,255,255,0.12); flex-shrink: 0; }
   .terminal-title { font-size: 11px; color: #8e8e93; font-weight: 600; letter-spacing: 0.5px; font-family: SFMono-Regular, Consolas, Monaco, monospace; }
   .terminal-clear-btn { background: rgba(255,59,48,0.2); color: #ff453a; border: none; border-radius: 6px; padding: 3px 10px; font-size: 11px; font-weight: 600; cursor: pointer; }
   .terminal-body { flex: 1; overflow-y: auto; color: #34c759; font-family: SFMono-Regular, Consolas, Monaco, monospace; font-size: 12px; line-height: 1.6; word-break: break-all; }
+  
   @media (max-width: 991px) {
     .dashboard-grid { display: flex; flex-direction: column; gap: 16px; }
     .main-section { display: flex; flex-direction: column; gap: 16px; }
