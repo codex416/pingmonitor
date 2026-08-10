@@ -2,918 +2,542 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>PingMonitor Dashboard</title>
-
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#f2f2f7">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<title>PingMonitor</title>
 <style>
-*{box-sizing:border-box}
-
-:root {
-  --bg-main: #f1f5f9;
-  --primary: #2563eb;
-  --primary-hover: #1d4ed8;
-  --text-main: #0f172a;
-  --text-muted: #64748b;
-  --card-bg: #ffffff;
-  --card-border: #e2e8f0;
-}
-
-body {
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  background-color: var(--bg-main);
-  background-image: radial-gradient(#cbd5e1 1px, transparent 1px);
-  background-size: 24px 24px;
-  margin: 0;
-  color: var(--text-main);
-  padding-bottom: 40px;
-}
-
-header {
-  background: var(--card-bg);
-  border: 1px solid var(--card-border);
-  border-radius: 16px;
-  max-width: 1400px;
-  margin: 20px auto 0;
-  padding: 20px 24px;
-  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.03);
-}
-
-.header-title {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 16px;
-}
-
-h1 {
-  margin: 0;
-  font-size: 22px;
-  font-weight: 700;
-  color: #1e293b;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-h1::before {
-  content: '';
-  display: inline-block;
-  width: 12px;
-  height: 12px;
-  background: #22c55e;
-  border-radius: 50%;
-  box-shadow: 0 0 10px #22c55e;
-}
-
-.stats-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-  gap: 16px;
-}
-
-.stat-card {
-  background: #f8fafc;
-  padding: 12px 16px;
-  border-radius: 12px;
-  border: 1px solid var(--card-border);
-}
-
-.stat-label {
-  font-size: 12px;
-  color: var(--text-muted);
-  font-weight: 500;
-}
-
-.stat-value {
-  font-size: 20px;
-  font-weight: 700;
-  margin-top: 4px;
-  color: var(--text-main);
-}
-
-.dashboard-grid {
-  max-width: 1400px;
-  margin: 20px auto;
-  padding: 0;
-  display: grid;
-  grid-template-columns: repeat(12, 1fr);
-  gap: 20px;
-}
-
-.col-12 { grid-column: span 12; }
-.col-8  { grid-column: span 8; }
-.col-6  { grid-column: span 6; }
-.col-4  { grid-column: span 4; }
-
-.box {
-  background: var(--card-bg);
-  padding: 20px 24px;
-  border-radius: 16px;
-  border: 1px solid var(--card-border);
-  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.03);
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-}
-
-.box-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 16px;
-}
-
-.box h3 {
-  margin: 0;
-  color: #1e293b;
-  font-size: 16px;
-  font-weight: 600;
-}
-
-.box h4 {
-  margin-top: 20px;
-  margin-bottom: 12px;
-  color: var(--text-muted);
-  font-size: 13px;
-  text-transform: uppercase;
-}
-
-.form-row {
-  display: flex;
-  gap: 10px;
-  align-items: center;
-  width: 100%;
-}
-
-.table-wrapper {
-  width: 100%;
-  overflow-x: auto;
-  border-radius: 10px;
-  border: 1px solid var(--card-border);
-}
-
-table {
-  width: 100%;
-  border-collapse: collapse;
-  white-space: nowrap;
-}
-
-th {
-  background: #f8fafc;
-  color: var(--text-muted);
-  font-weight: 600;
-  font-size: 13px;
-}
-
-th, td {
-  padding: 12px 16px;
-  border-bottom: 1px solid #f1f5f9;
-  text-align: center;
-  font-size: 14px;
-}
-
-tbody tr:hover {
-  background-color: #f8fafc;
-}
-
-tr:last-child td { border-bottom: none; }
-
-.ip-code {
-  background: #f1f5f9;
-  padding: 4px 10px;
-  border-radius: 6px;
-  cursor: pointer;
-  font-family: monospace;
-  font-size: 13px;
-  color: #334155;
-  transition: all 0.2s;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  user-select: none;
-  border: 1px solid #e2e8f0;
-}
-
-.ip-code:hover {
-  background: #e2e8f0;
-  color: var(--primary);
-  border-color: #cbd5e1;
-}
-
-.ip-code svg {
-  width: 13px;
-  height: 13px;
-  opacity: 0.6;
-  transition: opacity 0.2s;
-}
-
-.ip-code:hover svg {
-  opacity: 1;
-}
-
-.online, .offline, .checking {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 4px 10px;
-  border-radius: 20px;
-  font-size: 12px;
-  font-weight: 600;
-}
-
-.online { background-color: #dcfce7; color: #15803d; }
-.offline { background-color: #fee2e2; color: #b91c1c; }
-.checking { background-color: #dbeafe; color: #1d4ed8; }
-
-.delay-good { color: #16a34a; font-weight: 600; }
-.delay-medium { color: #d97706; font-weight: 600; }
-.delay-bad { color: #dc2626; font-weight: 700; }
-
-.checking::before {
-  content: '';
-  width: 6px;
-  height: 6px;
-  background: #2563eb;
-  border-radius: 50%;
-  animation: pulse 1s infinite alternate;
-}
-
-@keyframes pulse {
-  from { opacity: 0.3; }
-  to { opacity: 1; }
-}
-
-input {
-  width: 100%;
-  height: 42px !important;
-  line-height: 42px;
-  padding: 0 14px !important;
-  border-radius: 8px;
-  border: 1px solid #cbd5e1;
-  background-color: #f8fafc;
-  outline: none;
-  font-size: 14px;
-  transition: all 0.2s;
-  margin: 0;
-}
-
-input:focus {
-  background-color: #fff;
-  border-color: var(--primary);
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
-}
-
-button {
-  height: 42px !important;
-  line-height: 42px;
-  padding: 0 20px !important;
-  border-radius: 8px;
-  border: 0;
-  cursor: pointer;
-  background: var(--primary);
-  color: #fff;
-  font-size: 14px;
-  font-weight: 600;
-  transition: all 0.2s;
-  box-shadow: 0 2px 4px rgba(37, 99, 235, 0.15);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  white-space: nowrap;
-  flex-shrink: 0;
-}
-
-button:hover {
-  background: var(--primary-hover);
-  transform: translateY(-1px);
-}
-
-button:active { transform: translateY(0); }
-
-button.btn-danger { background: #ef4444; }
-button.btn-danger:hover { background: #dc2626; }
-
-button.btn-outline-danger {
-  background: #fff;
-  color: #ef4444;
-  border: 1px solid #fca5a5;
-  box-shadow: none;
-  height: 36px !important;
-  line-height: 36px;
-  padding: 0 12px !important;
-  font-size: 13px;
-}
-button.btn-outline-danger:hover { background: #fef2f2; }
-
-button.btn-outline-primary {
-  background: #fff;
-  color: var(--primary);
-  border: 1px solid #93c5fd;
-  box-shadow: none;
-}
-button.btn-outline-primary:hover { background: #eff6ff; }
-
-.terminal-bar {
-  display: flex;
-  align-items: center;
-  background: #1e293b;
-  padding: 10px 16px;
-  border-top-left-radius: 12px;
-  border-top-right-radius: 12px;
-  border-bottom: 1px solid #334155;
-}
-
-.terminal-dots {
-  display: flex;
-  gap: 6px;
-}
-
-.dot { width: 10px; height: 10px; border-radius: 50%; }
-.dot-red { background: #ef4444; }
-.dot-yellow { background: #f59e0b; }
-.dot-green { background: #10b981; }
-
-#logs {
-  background: #0f172a;
-  color: #4ade80;
-  height: 280px;
-  overflow-y: auto;
-  padding: 16px;
-  border-bottom-left-radius: 12px;
-  border-bottom-right-radius: 12px;
-  font-family: "JetBrains Mono", Consolas, Monaco, "Courier New", monospace;
-  font-size: 14px;
-  line-height: 1.7;
-  word-break: break-all;
-}
-
-#logs::-webkit-scrollbar { width: 8px; }
-#logs::-webkit-scrollbar-track { background: #0f172a; border-bottom-right-radius: 12px; }
-#logs::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
-#logs::-webkit-scrollbar-thumb:hover { background: #475569; }
-
-#toast {
-  position: fixed;
-  bottom: 20px;
-  right: 20px;
-  padding: 12px 20px;
-  background: #0f172a;
-  color: #fff;
-  border-radius: 8px;
-  font-size: 14px;
-  box-shadow: 0 10px 25px rgba(0,0,0,0.2);
-  transform: translateY(100px);
-  opacity: 0;
-  transition: all 0.3s cubic-bezier(0.68, -0.55, 0.27, 1.55);
-  z-index: 1000;
-}
-
-#toast.show {
-  transform: translateY(0);
-  opacity: 1;
-}
-
-@media(max-width: 1440px) {
-  header, .dashboard-grid { margin-left: 20px; margin-right: 20px; }
-}
-
-@media(max-width: 1024px) {
-  .col-8, .col-6, .col-4 { grid-column: span 12; }
-}
-
-@media(max-width: 768px) {
-  header { margin: 12px 12px 0; padding: 16px; border-radius: 12px; }
-  .dashboard-grid { margin: 12px 12px 20px; gap: 12px; }
-  .box { padding: 16px; border-radius: 12px; }
-  .form-row { flex-direction: column; align-items: stretch; }
-  input, button { width: 100% !important; }
-}
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  :root {
+    --ios-bg: #f2f2f7; --card-bg: #ffffff; --text-main: #000000; --text-muted: #8e8e93;
+    --ios-blue: #007aff; --ios-green: #34c759; --ios-red: #ff3b30; --ios-orange: #ff9500;
+    --card-radius: 14px; --divider-color: rgba(60, 60, 67, 0.12);
+  }
+  html, body {
+    margin: 0; padding: 0; width: 100%; min-height: 100%;
+    background-color: var(--ios-bg) !important; color: var(--text-main);
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Segoe UI", Roboto, "PingFang SC", sans-serif;
+    -webkit-font-smoothing: antialiased; overscroll-behavior-y: none;
+  }
+  .main-wrapper { max-width: 1320px; margin: 0 auto; padding: 0 20px calc(80px + env(safe-area-inset-bottom)); background-color: var(--ios-bg); }
+  .ios-large-header { padding-top: calc(env(safe-area-inset-top) + 20px); padding-bottom: 12px; }
+  .large-title { font-size: 32px; font-weight: 800; letter-spacing: -0.6px; color: var(--text-main); line-height: 1.1; }
+  .header-sub-row { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
+  .status-dot { width: 8px; height: 8px; border-radius: 50%; background-color: var(--ios-green); display: inline-block; flex-shrink: 0; transition: background-color 0.3s ease; }
+  .last-update-text { font-size: 13px; color: var(--text-muted); font-weight: 400; }
+  .group-title { font-size: 13px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: -0.1px; margin: 18px 2px 10px; }
+  .widget-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+  @media (min-width: 768px) { .widget-grid { grid-template-columns: repeat(4, 1fr); gap: 16px; } }
+  .widget-card { background: var(--card-bg); border-radius: var(--card-radius); padding: 16px 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.03); display: flex; flex-direction: column; justify-content: space-between; height: 90px; }
+  .widget-lbl { font-size: 13px; color: var(--text-muted); font-weight: 500; }
+  .widget-val { font-size: 28px; font-weight: 700; letter-spacing: -0.8px; line-height: 1; }
+  .ios-card { background: var(--card-bg); border-radius: var(--card-radius); overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.03); }
+  #nodes-container { overflow-y: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; -ms-overflow-style: none; max-height: 480px; }
+  #nodes-container::-webkit-scrollbar { display: none; }
+  .terminal-body::-webkit-scrollbar, .drawer-content::-webkit-scrollbar { width: 4px; }
+  .terminal-body::-webkit-scrollbar-thumb, .drawer-content::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.15); border-radius: 4px; }
+  .node-cards-grid { display: grid; grid-template-columns: 1fr; gap: 12px; }
+  .node-card { background: var(--card-bg); border-radius: var(--card-radius); padding: 16px 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.03); display: flex; flex-direction: column; gap: 12px; transition: transform 0.2s ease, box-shadow 0.2s ease; }
+  .node-top-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .node-identity { display: flex; flex-direction: column; gap: 3px; min-width: 0; flex: 1; }
+  .node-name { font-size: 17px; font-weight: 700; line-height: 1.25; color: var(--text-main); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .node-ip { font-size: 13px; color: var(--text-muted); font-family: SFMono-Regular, Monaco, Consolas, monospace; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; width: fit-content; }
+  .node-ip:hover { color: var(--ios-blue); text-decoration: underline; }
+  .node-bottom-row { display: flex; align-items: center; justify-content: space-between; padding-top: 10px; border-top: 0.5px solid var(--divider-color); }
+  .node-stats-group { display: flex; align-items: center; gap: 16px; font-size: 12px; color: var(--text-muted); }
+  .stat-val { font-weight: 600; color: var(--text-main); }
+  .node-action-group { display: flex; align-items: center; gap: 12px; }
+  .badge-online { color: #248a3d; background: rgba(52,199,89,0.15); padding: 4px 12px; border-radius: 6px; font-size: 12px; font-weight: 600; white-space: nowrap; }
+  .badge-offline { color: var(--ios-red); background: rgba(255,59,48,0.15); padding: 4px 12px; border-radius: 6px; font-size: 12px; font-weight: 600; white-space: nowrap; }
+  .badge-checking { color: var(--ios-blue); background: rgba(0,122,255,0.15); padding: 4px 12px; border-radius: 6px; font-size: 12px; font-weight: 600; white-space: nowrap; }
+  .delay-text { font-size: 15px; font-weight: 700; font-family: SFMono-Regular, Monaco, Consolas, monospace; }
+  .delay-good { color: var(--ios-green); }
+  .delay-medium { color: var(--ios-orange); }
+  .delay-bad { color: var(--ios-red); }
+  .del-btn { background: rgba(255,59,48,0.1); color: var(--ios-red); border: none; height: 30px; padding: 0 14px; font-size: 12px; font-weight: 600; border-radius: 6px; cursor: pointer; white-space: nowrap; transition: background 0.2s; }
+  .del-btn:hover { background: rgba(255,59,48,0.2); }
+  @media (min-width: 768px) {
+    .node-card { flex-direction: row; align-items: center; justify-content: space-between; padding: 18px 26px; gap: 24px; }
+    .node-top-row { flex: 1; border-top: none; padding-top: 0; }
+    .node-bottom-row { border-top: none; padding-top: 0; gap: 28px; }
+  }
+  .input-group { padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+  .ios-input { width: 100%; height: 40px; background: #f2f2f7; border: none; border-radius: 8px; padding: 0 12px; font-size: 14px; color: var(--text-main); outline: none; }
+  .ios-input:focus { background: #e5e5ea; }
+  .ios-btn { height: 40px; border-radius: 8px; border: none; background: var(--ios-blue); color: #ffffff; font-size: 14px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+  .ios-btn-secondary { background: #e5e5ea; color: var(--ios-blue); }
+  .ios-btn-danger { background: rgba(255,59,48,0.12); color: var(--ios-red); }
+  .terminal-card { background: #1c1c1e; border-radius: var(--card-radius); padding: 14px 18px; display: flex; flex-direction: column; box-shadow: 0 2px 8px rgba(0,0,0,0.03); flex: 1; min-height: 180px; }
+  .terminal-header { display: flex; align-items: center; justify-content: space-between; padding-bottom: 8px; margin-bottom: 8px; border-bottom: 0.5px solid rgba(255,255,255,0.12); flex-shrink: 0; }
+  .terminal-title { font-size: 11px; color: #8e8e93; font-weight: 600; letter-spacing: 0.5px; font-family: SFMono-Regular, Consolas, Monaco, monospace; }
+  .terminal-clear-btn { background: rgba(255,59,48,0.2); color: #ff453a; border: none; border-radius: 6px; padding: 3px 10px; font-size: 11px; font-weight: 600; cursor: pointer; }
+  .terminal-body { flex: 1; overflow-y: auto; color: #34c759; font-family: SFMono-Regular, Consolas, Monaco, monospace; font-size: 12px; line-height: 1.6; word-break: break-all; }
+  @media (max-width: 991px) {
+    .dashboard-grid { display: flex; flex-direction: column; gap: 16px; }
+    .main-section { display: flex; flex-direction: column; gap: 16px; }
+    .drawer-overlay {
+      position: fixed; top: 0; left: 0; right: 0; bottom: 0; width: 100vw; height: 100vh; height: 100dvh;
+      background: rgba(0,0,0,0.45); opacity: 0; visibility: hidden; pointer-events: none;
+      transition: opacity 0.3s ease, visibility 0.3s ease; z-index: 900;
+    }
+    .drawer-overlay.open { opacity: 1 !important; visibility: visible !important; pointer-events: auto !important; }
+    .bottom-drawer {
+      position: fixed; left: 0; right: 0; bottom: 0;
+      height: calc(100vh - env(safe-area-inset-top) - 10px); height: calc(100dvh - env(safe-area-inset-top) - 10px);
+      max-height: 720px; background: #f2f2f7; border-top-left-radius: 20px; border-top-right-radius: 20px;
+      box-shadow: 0 -6px 25px rgba(0,0,0,0.12); z-index: 1000;
+      transform: translate3d(0, calc(100% - 64px), 0); will-change: transform;
+      transition: transform 0.32s cubic-bezier(0.16, 1, 0.3, 1); display: flex; flex-direction: column;
+    }
+    .bottom-drawer.open { transform: translate3d(0, 0, 0) !important; }
+    .bottom-drawer.closed { transform: translate3d(0, calc(100% - 64px), 0) !important; }
+    .bottom-drawer.dragging { transition: none !important; }
+    .drawer-header-area { flex-shrink: 0; cursor: grab; user-select: none; padding-bottom: 4px; background: #f2f2f7; border-top-left-radius: 20px; border-top-right-radius: 20px; }
+    .drawer-header { height: 22px; display: flex; align-items: center; justify-content: center; }
+    .drawer-pill { width: 36px; height: 5px; border-radius: 3px; background: rgba(60,60,67,0.3); }
+    .drawer-title-bar { padding: 0 20px 10px; display: flex; align-items: center; justify-content: space-between; }
+    .drawer-title { font-size: 16px; font-weight: 700; }
+    .drawer-content { flex: 1; overflow-y: auto; padding: 0 16px calc(40px + env(safe-area-inset-bottom)); -webkit-overflow-scrolling: touch; }
+  }
+  @media (min-width: 992px) {
+    .drawer-overlay { display: none !important; }
+    .bottom-drawer { position: static !important; transform: none !important; background: transparent !important; box-shadow: none !important; height: auto !important; max-height: none !important; z-index: 1 !important; display: flex; flex-direction: column; }
+    .drawer-header-area { display: none !important; }
+    .dashboard-grid { display: grid; grid-template-columns: 1fr 380px; gap: 24px; align-items: stretch; margin-top: 10px; }
+    .main-section { grid-column: 1; display: flex; flex-direction: column; }
+    .logs-section-wrapper { display: flex; flex-direction: column; flex: 1; }
+    .controls-sidebar { grid-column: 2; display: flex; flex-direction: column; height: 100%; }
+    .drawer-content { flex: 1; display: flex; flex-direction: column; padding: 0 !important; overflow-y: visible !important; }
+    .controls-sidebar > div:last-child { flex: 1; display: flex; flex-direction: column; }
+    .controls-sidebar > div:last-child .ios-card { flex: 1; display: flex; flex-direction: column; }
+    .main-section .group-title:first-child, .controls-sidebar .group-title:first-child { margin-top: 0; }
+  }
+  #toast {
+    position: fixed; top: calc(env(safe-area-inset-top) + 20px); left: 50%;
+    transform: translateX(-50%) translateY(-60px); background: rgba(0,0,0,0.85);
+    backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); color: #fff;
+    padding: 10px 24px; border-radius: 25px; font-size: 14px; font-weight: 500;
+    opacity: 0; transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1); z-index: 2000; pointer-events: none;
+  }
+  #toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
 </style>
 </head>
-
 <body>
 
-<header>
-  <div class="header-title">
-    <h1>PingMonitor</h1>
-    <span style="font-size: 12px; color: var(--text-muted);" id="last-update">最后更新: --:--:--</span>
-  </div>
-
-  <div class="stats-grid">
-    <div class="stat-card">
-      <div class="stat-label">总监控节点</div>
-      <div class="stat-value" id="stat-total">0</div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-label">在线节点</div>
-      <div class="stat-value" style="color: #16a34a;" id="stat-online">0</div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-label">异常节点</div>
-      <div class="stat-value" style="color: #dc2626;" id="stat-offline">0</div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-label">平均延迟</div>
-      <div class="stat-value" style="color: #2563eb;" id="stat-delay">-- ms</div>
-    </div>
-  </div>
-</header>
-
-<main class="dashboard-grid">
-
-  <div class="box col-12">
-    <div class="box-header">
-      <h3>监控节点列表</h3>
-    </div>
-
-    <div class="table-wrapper">
-      <table>
-        <thead>
-          <tr>
-            <th>名称</th>
-            <th>IP / 域名</th>
-            <th>状态</th>
-            <th>延迟</th>
-            <th>最后检测</th>
-            <th>失败次数</th>
-            <th>操作</th>
-          </tr>
-        </thead>
-        <tbody id="nodes"></tbody>
-      </table>
-    </div>
-
-    <h4>添加新监控节点</h4>
-    <div class="form-row">
-      <div style="flex: 1;"><input id="name" placeholder="节点名称（例如: 香港服务器）"></div>
-      <div style="flex: 1;"><input id="ip" placeholder="IP 地址或域名"></div>
-      <button onclick="addNode()">添加节点</button>
+<div class="main-wrapper" id="main-content">
+  <div class="ios-large-header">
+    <div class="large-title">PingMonitor</div>
+    <div class="header-sub-row">
+      <span class="status-dot" id="header-dot"></span>
+      <span class="last-update-text" id="last-update">最后更新: --:--:--</span>
     </div>
   </div>
 
-  <div class="box col-6">
-    <div class="box-header">
-      <h3>Telegram Worker</h3>
-    </div>
-    <div class="form-row">
-      <div style="flex: 1;"><input id="worker" placeholder="https://your-worker.workers.dev"></div>
-      <button onclick="saveWorker()">保存配置</button>
-    </div>
+  <div class="group-title">系统状态概览</div>
+  <div class="widget-grid">
+    <div class="widget-card"><div class="widget-lbl">总监控节点</div><div class="widget-val" id="stat-total">0</div></div>
+    <div class="widget-card"><div class="widget-lbl">在线节点</div><div class="widget-val" style="color: var(--ios-green);" id="stat-online">0</div></div>
+    <div class="widget-card"><div class="widget-lbl">异常节点</div><div class="widget-val" style="color: var(--ios-red);" id="stat-offline">0</div></div>
+    <div class="widget-card"><div class="widget-lbl">平均延迟</div><div class="widget-val" style="color: var(--ios-blue);" id="stat-delay">-- ms</div></div>
   </div>
 
-  <div class="box col-6">
-    <div class="box-header">
-      <h3>检测频率</h3>
-    </div>
-    <div class="form-row">
-      <div style="flex: 1; position: relative; display: flex; align-items: center;">
-        <input id="interval" type="number" min="5" placeholder="60" style="padding-right: 35px !important;">
-        <span style="position: absolute; right: 12px; font-size: 13px; color: var(--text-muted); pointer-events: none;">秒</span>
-      </div>
-      <button onclick="saveInterval()">保存间隔</button>
-    </div>
-  </div>
-
-  <div class="box col-8">
-    <div class="box-header">
-      <h3>实时系统日志</h3>
-    </div>
-    <div>
-      <div class="terminal-bar">
-        <div class="terminal-dots">
-          <div class="dot dot-red"></div>
-          <div class="dot dot-yellow"></div>
-          <div class="dot dot-green"></div>
-        </div>
-      </div>
-      <div id="logs">加载日志中...</div>
-    </div>
-  </div>
-
-  <div class="box col-4">
-    <div>
-      <div class="box-header">
-        <h3>服务控制</h3>
-        <span class="online" id="service-status-badge">检测中</span>
+  <div class="dashboard-grid">
+    <div class="main-section">
+      <div class="group-title">监控节点列表</div>
+      <div id="nodes-container">
+        <div class="ios-card" style="padding: 24px; text-align: center; color: var(--text-muted); font-size: 14px;">正在加载节点...</div>
       </div>
 
-      <div style="background: #f8fafc; border: 1px solid var(--card-border); border-radius: 10px; padding: 12px 14px; margin-bottom: 16px;">
-        <div style="display: flex; justify-content: space-between; align-items: center; font-size: 13px; margin-bottom: 8px;">
-          <span style="color: var(--text-muted);">运行时间</span>
-          <span style="font-weight: 600; font-family: monospace;" id="service-uptime">--:--:--</span>
-        </div>
-        <div style="display: flex; justify-content: space-between; align-items: center; font-size: 13px;">
-          <span style="color: var(--text-muted);">上次指令</span>
-          <span style="font-size: 12px; color: var(--text-muted);" id="last-action-time">无动作</span>
+      <div class="logs-section-wrapper">
+        <div class="group-title">实时系统日志</div>
+        <div class="terminal-card">
+          <div class="terminal-header">
+            <span class="terminal-title">CONSOLE LOGS</span>
+            <button class="terminal-clear-btn" onclick="clearLogs()">清空日志</button>
+          </div>
+          <div class="terminal-body" id="logs">加载日志中...</div>
         </div>
       </div>
     </div>
 
-    <div>
-      <div class="form-row" style="margin-bottom: 10px;">
-        <button style="flex: 1;" onclick="service('start')">启动</button>
-        <button style="flex: 1;" class="btn-danger" onclick="service('stop')">停止</button>
-        <button style="flex: 1;" class="btn-outline-primary" onclick="service('restart')">重启</button>
+    <div class="bottom-drawer" id="drawer">
+      <div class="drawer-header-area" id="drawer-header-area" onclick="toggleDrawer()">
+        <div class="drawer-header"><div class="drawer-pill"></div></div>
+        <div class="drawer-title-bar"><div class="drawer-title">控制台与管理设置</div></div>
       </div>
       
-      <button class="btn-danger" style="width: 100%;" onclick="clearLogs()">
-        清空系统终端日志
-      </button>
+      <div class="drawer-content" id="drawer-content">
+        <div class="controls-sidebar">
+          <div>
+            <div class="group-title">添加新监控节点</div>
+            <div class="ios-card">
+              <div class="input-group">
+                <input class="ios-input" id="name" placeholder="节点名称（例如: 香港服务器）">
+                <input class="ios-input" id="ip" placeholder="IP 地址或域名">
+                <button class="ios-btn" onclick="addNode()">添加节点</button>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <div class="group-title">推送与检测配置</div>
+            <div class="ios-card">
+              <div class="input-group">
+                <div>
+                  <div style="font-size: 12px; color: var(--text-muted); font-weight: 500; margin-bottom: 6px;">Telegram Worker</div>
+                  <div style="display: flex; gap: 8px;">
+                    <input class="ios-input" id="worker" placeholder="https://your-worker.workers.dev">
+                    <button class="ios-btn ios-btn-secondary" style="width: 80px; flex-shrink: 0;" onclick="saveWorker()">保存</button>
+                  </div>
+                </div>
+                <div style="height: 0.5px; background: var(--divider-color);"></div>
+                <div>
+                  <div style="font-size: 12px; color: var(--text-muted); font-weight: 500; margin-bottom: 6px;">检测频率 (秒)</div>
+                  <div style="display: flex; gap: 8px;">
+                    <input class="ios-input" id="interval" type="number" min="5" placeholder="60">
+                    <button class="ios-btn ios-btn-secondary" style="width: 80px; flex-shrink: 0;" onclick="saveInterval()">保存</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <div class="group-title">服务控制</div>
+            <div class="ios-card" style="display: flex; flex-direction: column; justify-content: space-between;">
+              <div style="padding: 16px; display: flex; align-items: center; justify-content: space-between;">
+                <div>
+                  <div style="font-size: 14px; font-weight: 600;">后台运行状态</div>
+                  <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">运行时间: <span id="service-uptime" style="font-family: monospace; font-weight: 600;">--:--:--</span></div>
+                </div>
+                <span class="badge-online" id="service-status-badge">检测中</span>
+              </div>
+              <div style="height: 0.5px; background: var(--divider-color);"></div>
+              <div style="padding: 16px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: auto;">
+                <button class="ios-btn" style="height: 40px; font-size: 13px;" onclick="service('start')">启动</button>
+                <button class="ios-btn ios-btn-danger" style="height: 40px; font-size: 13px;" onclick="service('stop')">停止</button>
+                <button class="ios-btn ios-btn-secondary" style="height: 40px; font-size: 13px;" onclick="service('restart')">重启</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
+</div>
 
-</main>
-
+<div class="drawer-overlay" id="drawer-overlay" onclick="toggleDrawer(false)"></div>
 <div id="toast">提示信息</div>
 
 <script>
-function formatUptime(diffSec) {
-    if (diffSec < 0) diffSec = 0;
-    let days = Math.floor(diffSec / 86400);
-    let hours = Math.floor((diffSec % 86400) / 3600);
-    let mins = Math.floor((diffSec % 3600) / 60);
-    let secs = diffSec % 60;
+const USE_MOCK = false;
+let lastRenderedHTML = "", lastLogsText = "";
+const $ = id => document.getElementById(id);
 
-    let timeStr = "";
-    if (days > 0) timeStr += days + "天 ";
-    timeStr += String(hours).padStart(2, '0') + ":" + 
-               String(mins).padStart(2, '0') + ":" + 
-               String(secs).padStart(2, '0');
-    return timeStr;
-}
-
-async function loadServiceStatus() {
-    try {
-        let r = await fetch("/api/system");
-        if (!r.ok) return;
-        let data = await r.json();
-
-        let badge = document.getElementById("service-status-badge");
-        let uptimeEl = document.getElementById("service-uptime");
-        let lastActionEl = document.getElementById("last-action-time");
-
-        if (data.running) {
-            badge.innerText = "运行中";
-            badge.className = "online";
-            uptimeEl.style.color = "var(--text-main)";
-            uptimeEl.innerText = formatUptime(data.uptime);
-        } else {
-            badge.innerText = "已停止";
-            badge.className = "offline";
-            uptimeEl.innerText = "已停止";
-            uptimeEl.style.color = "var(--text-muted)";
-        }
-
-        // 实时从后端同步上次指令状态
-        if (data.last_action) {
-            lastActionEl.innerText = data.last_action;
-        }
-    } catch(e) {
-        console.error(e);
-    }
+function formatUptime(s) {
+    if (s < 0) s = 0;
+    const d = Math.floor(s / 86400), h = Math.floor((s % 86400) / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
+    return (d > 0 ? d + "天 " : "") + [h, m, sec].map(v => String(v).padStart(2, '0')).join(':');
 }
 
 function showToast(msg) {
-    let t = document.getElementById("toast");
+    const t = $("toast");
     t.innerText = msg;
     t.classList.add("show");
-    setTimeout(() => { t.classList.remove("show"); }, 3000);
+    setTimeout(() => t.classList.remove("show"), 3000);
 }
 
 function copyText(text) {
     if (navigator.clipboard && window.isSecureContext) {
-        navigator.clipboard.writeText(text).then(() => {
-            showToast(`已复制: ${text}`);
-        }).catch(() => {
-            fallbackCopy(text);
-        });
+        navigator.clipboard.writeText(text).then(() => showToast(`已复制: ${text}`)).catch(() => fallbackCopy(text));
     } else {
         fallbackCopy(text);
     }
 }
 
 function fallbackCopy(text) {
-    let textArea = document.createElement("textarea");
-    textArea.value = text;
-    textArea.style.position = "fixed";
-    textArea.style.left = "-9999px";
-    document.body.appendChild(textArea);
-    textArea.focus();
-    textArea.select();
-    try {
-        document.execCommand('copy');
-        showToast(`已复制: ${text}`);
-    } catch (err) {
-        showToast("复制失败，请手动复制");
-    }
-    document.body.removeChild(textArea);
+    const ta = document.createElement("textarea");
+    ta.value = text;
+    ta.style.cssText = "position:fixed;left:-9999px";
+    document.body.appendChild(ta);
+    ta.focus(); ta.select();
+    try { document.execCommand('copy'); showToast(`已复制: ${text}`); } catch { showToast("复制失败"); }
+    document.body.removeChild(ta);
 }
 
-async function loadConfig(isInitial = false){
-    try {
-        let r = await fetch("/api/config");
-        if(!r.ok) throw new Error("配置文件加载失败");
-        let c = await r.json();
-
-        let workerInput = document.getElementById("worker");
-        let intervalInput = document.getElementById("interval");
-
-        if (isInitial || document.activeElement !== workerInput) {
-            workerInput.value = c.worker || "";
-        }
-        if (isInitial || document.activeElement !== intervalInput) {
-            intervalInput.value = c.interval || 60;
-        }
-        return c;
-    } catch(e) {
-        console.error(e);
-        return { nodes: [] };
-    }
+async function fetchJSON(url) {
+    try { const res = await fetch(url); return res.ok ? await res.json() : null; } catch { return null; }
 }
 
-async function loadStatus(){
-    try {
-        let configReq = await fetch("/api/config");
-        let config = await configReq.json();
+async function refreshDashboard(isInitial = false) {
+    const [config, status, sysData, logsData] = await Promise.all([
+        fetchJSON("/api/config"), fetchJSON("/api/status"), fetchJSON("/api/system"), fetchJSON("/api/logs")
+    ]);
 
-        let r = await fetch("/api/status");
-        if(!r.ok) throw new Error("状态加载失败");
-        let status = await r.json();
+    if (sysData) {
+        const badge = $("service-status-badge"), uptimeEl = $("service-uptime"), dot = $("header-dot");
+        if (sysData.running) {
+            badge.className = "badge-online"; badge.innerText = "运行中";
+            uptimeEl.style.color = "var(--text-main)"; uptimeEl.innerText = formatUptime(sysData.uptime);
+            if (dot) dot.style.backgroundColor = "var(--ios-green)";
+        } else {
+            badge.className = "badge-offline"; badge.innerText = "已停止";
+            uptimeEl.innerText = "已停止"; uptimeEl.style.color = "var(--text-muted)";
+            if (dot) dot.style.backgroundColor = "var(--ios-red)";
+        }
+    }
 
-        let sysReq = await fetch("/api/system");
-        let sysData = sysReq.ok ? await sysReq.json() : { running: false };
-        let isRunning = sysData && sysData.running;
+    if (config) {
+        const wIn = $("worker"), iIn = $("interval");
+        if (isInitial || document.activeElement !== wIn) wIn.value = config.worker || "";
+        if (isInitial || document.activeElement !== iIn) iIn.value = config.interval || 60;
+        
+        const isRunning = sysData && sysData.running;
+        const statusMap = {};
+        (status || []).forEach(n => statusMap[n.ip] = n);
 
-        let map = {};
-        (status || []).forEach(n => { map[n.ip] = n; });
-
-        let data = [];
         let totalOnline = 0, totalOffline = 0, totalDelay = 0, delayCount = 0;
+        const nodes = config.nodes || [];
+        
+        const htmlParts = nodes.map(n => {
+            const item = !isRunning ? { name: n.name, ip: n.ip, status: "等待检测", delay: "-", last: "-", fail: 0 }
+                       : (statusMap[n.ip] ? { ...statusMap[n.ip] } : { name: n.name, ip: n.ip, status: "检测中", delay: "-", last: "-", fail: 0 });
 
-        (config.nodes || []).forEach(n => {
-            let item;
-            if (!isRunning) {
-                item = {
-                    name: n.name,
-                    ip: n.ip,
-                    status: "等待检测",
-                    delay: "-",
-                    last: "-",
-                    fail: (map[n.ip] && map[n.ip].fail !== undefined) ? map[n.ip].fail : 0
-                };
+            if (item.status === "在线") totalOnline++;
+            if (item.status === "离线") totalOffline++;
+            const numDelay = parseInt(item.delay);
+            if (!isNaN(numDelay)) { totalDelay += numDelay; delayCount++; }
+
+            const badgeCls = item.status === "在线" ? "badge-online" : (item.status === "离线" ? "badge-offline" : "badge-checking");
+            const delayCls = !isNaN(numDelay) ? (numDelay < 150 ? 'delay-good' : (numDelay < 400 ? 'delay-medium' : 'delay-bad')) : "";
+            const failCount = parseInt(item.fail) || 0;
+
+            return `
+            <div class="node-card">
+              <div class="node-top-row">
+                <div class="node-identity">
+                  <span class="node-name" title="${escapeHtml(item.name || '未命名')}">${escapeHtml(item.name || '未命名')}</span>
+                  <span class="node-ip" onclick="copyText('${escapeHtml(item.ip)}')">${escapeHtml(item.ip)}</span>
+                </div>
+                <div style="display:flex; align-items:center; gap:12px;">
+                  <span class="${badgeCls}">${escapeHtml(item.status)}</span>
+                  <span class="delay-text ${delayCls}">${escapeHtml(String(item.delay))}</span>
+                </div>
+              </div>
+              <div class="node-bottom-row">
+                <div class="node-stats-group">
+                  <span>最后检测: <strong class="stat-val">${escapeHtml(String(item.last))}</strong></span>
+                  ${failCount > 0 ? `<span style="color:var(--ios-red);">连续失败: <strong style="color:var(--ios-red);">${failCount} 次</strong></span>` : ''}
+                </div>
+                <div class="node-action-group">
+                  <button class="del-btn" onclick="delNode('${escapeHtml(item.ip)}')">删除</button>
+                </div>
+              </div>
+            </div>`;
+        });
+
+        $("stat-total").innerText = nodes.length;
+        $("stat-online").innerText = totalOnline;
+        $("stat-offline").innerText = totalOffline;
+        $("stat-delay").innerText = delayCount > 0 ? Math.round(totalDelay / delayCount) + " ms" : "-- ms";
+        $("last-update").innerText = "最后更新: " + new Date().toLocaleTimeString('zh-CN', { hour12: false });
+
+        const container = $("nodes-container");
+        if (nodes.length === 0) {
+            container.innerHTML = '<div class="ios-card" style="padding: 24px; text-align: center; color: var(--text-muted); font-size: 14px;">暂无监控节点，请在右侧添加</div>';
+            lastRenderedHTML = "";
+        } else {
+            const finalHTML = '<div class="node-cards-grid">' + htmlParts.join('') + '</div>';
+            if (finalHTML !== lastRenderedHTML) {
+                container.innerHTML = finalHTML;
+                lastRenderedHTML = finalHTML;
+            }
+        }
+    }
+
+    if (logsData) {
+        const box = $("logs");
+        const logsStr = (logsData || []).join("\n");
+        if (logsStr !== lastLogsText) {
+            lastLogsText = logsStr;
+            if (!logsData || logsData.length === 0) {
+                box.innerHTML = "暂无日志或日志已被清空。";
             } else {
-                item = map[n.ip] ? { ...map[n.ip] } : {
-                    name: n.name,
-                    ip: n.ip,
-                    status: "检测中",
-                    delay: "-",
-                    last: "-",
-                    fail: 0
-                };
+                box.innerHTML = logsData.map(line => escapeHtml(line)).join("<br>");
+                box.scrollTop = box.scrollHeight;
             }
+        }
+    }
+}
 
-            if(item.status === "在线") totalOnline++;
-            if(item.status === "离线") totalOffline++;
-            
-            let numericDelay = parseInt(item.delay);
-            if(!isNaN(numericDelay)) {
-                totalDelay += numericDelay;
-                delayCount++;
-            }
-
-            data.push(item);
+async function apiPost(url, data, successMsg) {
+    try {
+        const res = await fetch(url, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(data)
         });
-
-        document.getElementById("stat-total").innerText = data.length;
-        document.getElementById("stat-online").innerText = totalOnline;
-        document.getElementById("stat-offline").innerText = totalOffline;
-        document.getElementById("stat-delay").innerText = delayCount > 0 ? Math.round(totalDelay / delayCount) + " ms" : "-- ms";
-        document.getElementById("last-update").innerText = "最后更新: " + new Date().toLocaleTimeString();
-
-        let html = "";
-        data.forEach(n => {
-            let cls = "checking";
-            if(n.status === "在线") cls = "online";
-            if(n.status === "离线") cls = "offline";
-
-            let delayStyle = "";
-            let numericDelay = parseInt(n.delay);
-            if(!isNaN(numericDelay)) {
-                if(numericDelay < 150) delayStyle = 'class="delay-good"';
-                else if(numericDelay < 400) delayStyle = 'class="delay-medium"';
-                else delayStyle = 'class="delay-bad"';
-            }
-
-            let ipHtml = `
-              <span class="ip-code" title="点击复制 IP / 域名" onclick="copyText('${escapeHtml(n.ip)}')">
-                ${escapeHtml(n.ip)}
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-                  <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-                </svg>
-              </span>
-            `;
-
-            let failCount = parseInt(n.fail) || 0;
-
-            html += `
-            <tr>
-                <td style="font-weight: 500;">${escapeHtml(n.name || '-')}</td>
-                <td>${ipHtml}</td>
-                <td><span class="${cls}">${escapeHtml(n.status)}</span></td>
-                <td ${delayStyle}>${escapeHtml(String(n.delay))}</td>
-                <td style="color: var(--text-muted); font-size: 13px;">${escapeHtml(String(n.last))}</td>
-                <td>${failCount > 0 ? `<span style="color:#ef4444; font-weight:bold;">${failCount}</span>` : 0}</td>
-                <td>
-                    <button class="btn-outline-danger" onclick="delNode('${escapeHtml(n.ip)}')">删除</button>
-                </td>
-            </tr>
-            `;
-        });
-
-        document.getElementById("nodes").innerHTML = html || '<tr><td colspan="7" style="color:var(--text-muted); padding:20px;">暂无监控节点，请在下方添加</td></tr>';
-    } catch(e) {
-        console.error(e);
+        const json = await res.json().catch(() => ({}));
+        if (res.ok && (json.ok !== false)) {
+            if (successMsg) showToast(successMsg);
+            await refreshDashboard();
+            return json;
+        } else {
+            showToast(json.error || "操作失败");
+            return null;
+        }
+    } catch {
+        showToast("网络请求失败");
+        return null;
     }
 }
 
 async function addNode(){
-    let name = document.getElementById("name").value.trim();
-    let ip = document.getElementById("ip").value.trim();
-
-    if(!ip){
-        showToast("请输入有效的 IP 地址或域名");
-        return;
-    }
-
-    try {
-        await fetch("/api/add",{
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ name, ip })
-        });
-
-        document.getElementById("name").value = "";
-        document.getElementById("ip").value = "";
-        showToast("节点添加成功");
-        await loadStatus();
-    } catch(e) {
-        showToast("添加失败，请检查网络");
+    const name = $("name").value.trim(), ip = $("ip").value.trim();
+    if (!ip) { showToast("请输入有效的 IP 地址或域名"); return; }
+    if (await apiPost("/api/add", { name, ip }, "节点添加成功")) {
+        $("name").value = ""; $("ip").value = "";
     }
 }
 
 async function delNode(ip){
-    if(!confirm(`确定要删除节点 [${ip}] 吗？`)) return;
-
-    try {
-        await fetch("/api/delete",{
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ ip })
-        });
-        showToast("节点已删除");
-        await loadStatus();
-    } catch(e) {
-        showToast("删除失败");
+    if (confirm(`确定要删除节点 [${ip}] 吗？`)) {
+        await apiPost("/api/delete", { ip }, "节点已删除");
     }
 }
 
 async function saveWorker(){
-    let worker = document.getElementById("worker").value.trim();
-    try {
-        await fetch("/api/worker",{
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ worker })
-        });
-        showToast("Telegram Worker 已保存");
-    } catch(e) {
-        showToast("保存失败");
-    }
+    await apiPost("/api/worker", { worker: $("worker").value.trim() }, "Telegram Worker 已保存");
 }
 
 async function saveInterval(){
-    let interval = document.getElementById("interval").value;
-    if(!interval || interval < 5) {
-        showToast("间隔时间不能小于 5 秒");
-        return;
-    }
-
-    try {
-        await fetch("/api/interval",{
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ interval })
-        });
-        showToast("检测间隔已更新");
-    } catch(e) {
-        showToast("保存失败");
-    }
+    const interval = $("interval").value;
+    if (!interval || interval < 5) { showToast("间隔时间不能小于 5 秒"); return; }
+    await apiPost("/api/interval", { interval }, "检测间隔已更新");
 }
 
 async function service(a){
+    const actionMap = { start: '启动', stop: '停止', restart: '重启' };
     try {
-        let r = await fetch("/api/service/" + a);
-        let res = await r.json();
-        let actionMap = { start: '启动', stop: '停止', restart: '重启' };
-        let actionName = actionMap[a] || a;
-        
-        if (res.ok) {
-            showToast(`服务${actionName}指令已发送`);
+        const res = await fetch("/api/service/" + a);
+        const json = await res.json();
+        if (json.ok) {
+            showToast(`服务${actionMap[a] || a}指令已发送`);
+            setTimeout(refreshDashboard, 500);
         } else {
-            showToast(`指令发送失败: ${res.error || '未知错误'}`);
+            showToast(`指令发送失败: ${json.error || '未知错误'}`);
         }
-
-        setTimeout(async () => {
-            await loadServiceStatus();
-            await loadStatus();
-        }, 500);
-    } catch(e) {
+    } catch {
         showToast("指令发送失败");
     }
 }
 
 async function clearLogs(){
-    if(!confirm("确定要清空系统终端日志吗？")) return;
+    if (!confirm("确定要清空系统终端日志吗？")) return;
     try {
-        let r = await fetch("/api/logs/clear", { method: "POST" });
-        let res = await r.json();
-        if (res.ok) {
-            await loadLogs();
+        const res = await fetch("/api/logs/clear", { method: "POST" });
+        const json = await res.json();
+        if (json.ok) {
+            lastLogsText = "";
+            await refreshDashboard();
             showToast("系统终端日志已清空");
         } else {
-            showToast(`清空日志失败: ${res.error || '未知错误'}`);
+            showToast(`清空日志失败: ${json.error || '未知错误'}`);
         }
-    } catch(e) {
+    } catch {
         showToast("清空日志失败");
-    }
-}
-
-async function loadLogs(){
-    try {
-        let r = await fetch("/api/logs");
-        if(!r.ok) return;
-        let data = await r.json();
-
-        let box = document.getElementById("logs");
-        if(data.length === 0) {
-            box.innerHTML = "暂无日志或日志已被清空。";
-            return;
-        }
-        box.innerHTML = data.map(line => escapeHtml(line)).join("<br>");
-        
-        setTimeout(() => {
-            box.scrollTop = box.scrollHeight;
-        }, 0);
-    } catch(e) {
-        console.error(e);
     }
 }
 
 function escapeHtml(str) {
     if (!str) return '';
-    return String(str)
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;")
-        .replace(/'/g, "&#039;");
+    return String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
 }
 
-// 页面初始化
-loadConfig(true);
-loadStatus();
-loadLogs();
-loadServiceStatus();
+const drawer = $("drawer"), overlay = $("drawer-overlay"), headerArea = $("drawer-header-area"), drawerContent = $("drawer-content");
+let isExpanded = false, startY = 0, currentY = 0, isDragging = false, isPullFromContent = false, maxTranslate = 0, rafId = null;
 
-let timerStatus, timerLogs, timerService;
+function isMobile() { return window.innerWidth < 992; }
 
-function startPolling() {
-    stopPolling();
-    timerStatus = setInterval(loadStatus, 5000);
-    timerLogs = setInterval(loadLogs, 5000);
-    timerService = setInterval(loadServiceStatus, 5000);
-}
-
-function stopPolling() {
-    clearInterval(timerStatus);
-    clearInterval(timerLogs);
-    clearInterval(timerService);
-}
-
-startPolling();
-
-document.addEventListener("visibilitychange", () => {
-    if (document.hidden) {
-        stopPolling();
+function toggleDrawer(expand, fromPopState = false) {
+    if (!isMobile()) return;
+    isExpanded = expand !== undefined ? expand : !isExpanded;
+    drawer.style.transform = ""; overlay.style.opacity = ""; drawer.classList.remove("dragging");
+    if (isExpanded) {
+        drawer.classList.add("open"); drawer.classList.remove("closed"); overlay.classList.add("open");
+        if (!fromPopState) history.pushState({ drawerOpen: true }, "");
     } else {
-        loadStatus();
-        loadLogs();
-        loadServiceStatus();
-        startPolling();
+        drawer.classList.add("closed"); drawer.classList.remove("open"); overlay.classList.remove("open");
+        if (!fromPopState && history.state && history.state.drawerOpen) setTimeout(() => history.back(), 50);
+    }
+}
+
+window.addEventListener("popstate", () => { if (isMobile() && isExpanded) toggleDrawer(false, true); });
+
+function onTouchStart(e, fromContent = false) {
+    if (!isMobile()) return;
+    if (fromContent && (drawerContent.scrollTop > 0 || !isExpanded)) return;
+    startY = e.touches[0].clientY; currentY = startY; isDragging = true; isPullFromContent = fromContent;
+    maxTranslate = drawer.offsetHeight - 64; drawer.classList.add("dragging");
+}
+
+function onTouchMove(e) {
+    if (!isDragging || !isMobile()) return;
+    currentY = e.touches[0].clientY;
+    if (rafId) cancelAnimationFrame(rafId);
+    rafId = requestAnimationFrame(() => {
+        const deltaY = currentY - startY;
+        let currentTranslate = 0;
+        if (isPullFromContent) {
+            if (deltaY > 0 && drawerContent.scrollTop <= 0) {
+                if (e.cancelable) e.preventDefault();
+                currentTranslate = deltaY;
+            } else { isDragging = false; return; }
+        } else {
+            if (e.cancelable) e.preventDefault();
+            currentTranslate = !isExpanded ? Math.max(0, maxTranslate + deltaY) : Math.max(0, deltaY);
+        }
+        drawer.style.transform = `translate3d(0, ${currentTranslate}px, 0)`;
+        const progress = Math.max(0, Math.min(1, 1 - (currentTranslate / maxTranslate)));
+        overlay.style.opacity = progress;
+        if (progress > 0) overlay.classList.add("open");
+    });
+}
+
+function onTouchEnd() {
+    if (!isDragging || !isMobile()) return;
+    isDragging = false;
+    if (rafId) cancelAnimationFrame(rafId);
+    const deltaY = currentY - startY;
+    toggleDrawer(!isExpanded ? deltaY < -40 : deltaY <= 50);
+    startY = 0; currentY = 0; isPullFromContent = false;
+}
+
+headerArea.addEventListener("touchstart", e => onTouchStart(e, false), { passive: true });
+headerArea.addEventListener("touchmove", onTouchMove, { passive: false });
+headerArea.addEventListener("touchend", onTouchEnd);
+
+drawerContent.addEventListener("touchstart", e => onTouchStart(e, true), { passive: true });
+drawerContent.addEventListener("touchmove", onTouchMove, { passive: false });
+drawerContent.addEventListener("touchend", onTouchEnd);
+
+window.addEventListener('resize', () => {
+    drawer.style.transform = ""; overlay.style.opacity = ""; drawer.classList.remove("dragging");
+    if (!isMobile()) {
+        drawer.classList.remove("open", "closed"); overlay.classList.remove("open");
+    } else {
+        drawer.classList.toggle("open", isExpanded); drawer.classList.toggle("closed", !isExpanded); overlay.classList.toggle("open", isExpanded);
     }
 });
-</script>
 
+refreshDashboard(true);
+let pollTimer = setInterval(refreshDashboard, 5000);
+
+document.addEventListener("visibilitychange", () => {
+    if (document.hidden) { clearInterval(pollTimer); pollTimer = null; }
+    else { refreshDashboard(); if (!pollTimer) pollTimer = setInterval(refreshDashboard, 5000); }
+});
+</script>
 </body>
 </html>
