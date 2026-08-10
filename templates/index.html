@@ -71,11 +71,18 @@
   .delay-bad { color: var(--ios-red); }
   .del-btn { background: rgba(255,59,48,0.1); color: var(--ios-red); border: none; height: 30px; padding: 0 14px; font-size: 12px; font-weight: 600; border-radius: 6px; cursor: pointer; white-space: nowrap; transition: background 0.2s; }
   .del-btn:hover { background: rgba(255,59,48,0.2); }
-  @media (min-width: 768px) {
+
+  /* 响应式空状态文案显隐逻辑 */
+  .empty-pc { display: none; }
+  .empty-mobile { display: inline; }
+  @media (min-width: 992px) {
+    .empty-pc { display: inline; }
+    .empty-mobile { display: none; }
     .node-card { flex-direction: row; align-items: center; justify-content: space-between; padding: 18px 26px; gap: 24px; }
     .node-top-row { flex: 1; border-top: none; padding-top: 0; }
     .node-bottom-row { border-top: none; padding-top: 0; gap: 28px; }
   }
+
   .input-group { padding: 16px; display: flex; flex-direction: column; gap: 12px; }
   .ios-input { width: 100%; height: 40px; background: #f2f2f7; border: none; border-radius: 8px; padding: 0 12px; font-size: 14px; color: var(--text-main); outline: none; }
   .ios-input:focus { background: #e5e5ea; }
@@ -362,7 +369,7 @@ async function refreshDashboard(isInitial = false) {
 
         const container = $("nodes-container");
         if (nodes.length === 0) {
-            container.innerHTML = '<div class="ios-card" style="padding: 24px; text-align: center; color: var(--text-muted); font-size: 14px;">暂无监控节点，请在下方或右侧添加</div>';
+            container.innerHTML = '<div class="ios-card" style="padding: 24px; text-align: center; color: var(--text-muted); font-size: 14px;"><span class="empty-pc">暂无监控节点，请在右侧添加</span><span class="empty-mobile">暂无监控节点，请在下方添加</span></div>';
             lastRenderedHTML = "";
         } else {
             const finalHTML = '<div class="node-cards-grid">' + htmlParts.join('') + '</div>';
