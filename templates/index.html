@@ -362,7 +362,7 @@ async function refreshDashboard(isInitial = false) {
 
         const container = $("nodes-container");
         if (nodes.length === 0) {
-            container.innerHTML = '<div class="ios-card" style="padding: 24px; text-align: center; color: var(--text-muted); font-size: 14px;">暂无监控节点，请在右侧添加</div>';
+            container.innerHTML = '<div class="ios-card" style="padding: 24px; text-align: center; color: var(--text-muted); font-size: 14px;">暂无监控节点，请在下方或右侧添加</div>';
             lastRenderedHTML = "";
         } else {
             const finalHTML = '<div class="node-cards-grid">' + htmlParts.join('') + '</div>';
