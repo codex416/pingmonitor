@@ -32,13 +32,13 @@
   .status-dot { width: 8px; height: 8px; border-radius: 50%; background-color: var(--ios-green); display: inline-block; flex-shrink: 0; transition: background-color 0.3s ease; }
   .last-update-text { font-size: 13px; color: var(--text-muted); font-weight: 400; }
   
-  /* 基础区块标题：默认上下间距 */
-  .group-title { font-size: 13px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: -0.1px; margin: 24px 2px 14px; }
+  /* 基础区块标题：默认移动端间距 */
+  .group-title { font-size: 13px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: -0.1px; margin: 24px 2px 12px; }
   
-  /* 针对你特别指出偏上的三个标题，赋予更大的上方间距，强制下压至两卡片正中间 */
+  /* 针对你指定的三个标题：在移动端和桌面端都统一加大上方间距，使其完美下沉到两张卡片正中间 */
   .group-title.middle-title {
-    margin-top: 40px !important;
-    margin-bottom: 14px !important;
+    margin-top: 36px !important;
+    margin-bottom: 12px !important;
   }
   
   .widget-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
@@ -167,7 +167,6 @@
       </div>
 
       <div class="logs-section-wrapper">
-        <!-- 实时系统日志标题应用 middle-title 样式 -->
         <div class="group-title middle-title">实时系统日志</div>
         <div class="terminal-card">
           <div class="terminal-header">
@@ -199,7 +198,6 @@
           </div>
 
           <div>
-            <!-- 推送与检测配置标题应用 middle-title 样式 -->
             <div class="group-title middle-title">推送与检测配置</div>
             <div class="ios-card">
               <div class="input-group">
@@ -223,7 +221,6 @@
           </div>
 
           <div>
-            <!-- 服务控制标题应用 middle-title 样式 -->
             <div class="group-title middle-title">服务控制</div>
             <div class="ios-card" style="display: flex; flex-direction: column; justify-content: space-between;">
               <div style="padding: 16px; display: flex; align-items: center; justify-content: space-between;">
