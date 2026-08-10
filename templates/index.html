@@ -472,18 +472,27 @@ function toggleDrawer(expand, fromPopState = false) {
     if (!isMobile()) return;
     isExpanded = expand !== undefined ? expand : !isExpanded;
     drawer.style.transform = ""; overlay.style.opacity = ""; drawer.classList.remove("dragging");
+    
     if (isExpanded) {
         drawer.classList.add("open"); drawer.classList.remove("closed"); overlay.classList.add("open");
         document.body.classList.add("drawer-open");
-        if (!fromPopState) history.pushState({ drawerOpen: true }, "");
+        if (!fromPopState) {
+            try { history.pushState({ drawerOpen: true }, ""); } catch(e) {}
+        }
     } else {
         drawer.classList.add("closed"); drawer.classList.remove("open"); overlay.classList.remove("open");
         document.body.classList.remove("drawer-open");
-        if (!fromPopState && history.state && history.state.drawerOpen) setTimeout(() => history.back(), 50);
+        if (!fromPopState && history.state && history.state.drawerOpen) {
+            try { history.back(); } catch(e) {}
+        }
     }
 }
 
-window.addEventListener("popstate", () => { if (isMobile() && isExpanded) toggleDrawer(false, true); });
+window.addEventListener("popstate", (e) => {
+    if (isMobile() && isExpanded) {
+        toggleDrawer(false, true);
+    }
+});
 
 function onTouchStart(e, fromContent = false) {
     if (!isMobile()) return;
