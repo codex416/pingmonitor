@@ -105,7 +105,6 @@
       height: calc(100vh - env(safe-area-inset-top) - 10px); height: calc(100dvh - env(safe-area-inset-top) - 10px);
       max-height: 720px; background: #f2f2f7; border-top-left-radius: 20px; border-top-right-radius: 20px;
       box-shadow: 0 -6px 25px rgba(0,0,0,0.12); z-index: 1000;
-      /* 默认完全隐藏并禁用点击交互 */
       transform: translate3d(0, 100%, 0);
       visibility: hidden;
       pointer-events: none;
@@ -194,7 +193,7 @@
       </div>
     </div>
 
-    <!-- 移动端默认带有 closed 类，配合 CSS 的 visibility:hidden 完全隐藏 -->
+    <!-- 移动端抽屉控制面板 -->
     <div class="bottom-drawer closed" id="drawer">
       <div class="drawer-header-area" id="drawer-header-area" onclick="toggleDrawer()">
         <div class="drawer-header"><div class="drawer-pill"></div></div>
@@ -430,8 +429,21 @@ async function apiPost(url, data, successMsg) {
 async function addNode(){
     const name = $("name").value.trim(), ip = $("ip").value.trim();
     if (!ip) { showToast("请输入有效的 IP 地址或域名"); return; }
-    if (await apiPost("/api/add", { name, ip }, "节点添加成功")) {
+    
+    // 添加节点
+    const result = await apiPost("/api/add", { name, ip }, "节点添加成功");
+    if (result) {
         $("name").value = ""; $("ip").value = "";
+        
+        // 检查服务是否正在运行，如果是，则立即触发一次检查/刷新以让新节点开始检测
+        try {
+            const sysRes = await fetch("/api/system");
+            const sysData = await sysRes.json().catch(() => ({}));
+            if (sysData && sysData.running) {
+                // 如果后端有触发检测的接口可在此调用，或者直接强行刷新面板
+                await refreshDashboard();
+            }
+        } catch(e) {}
     }
 }
 
