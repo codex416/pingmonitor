@@ -42,7 +42,7 @@
   .widget-lbl { font-size: 13px; color: var(--text-muted); font-weight: 500; }
   .widget-val { font-size: 28px; font-weight: 700; letter-spacing: -0.8px; line-height: 1; }
   .ios-card { background: var(--card-bg); border-radius: var(--card-radius); overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.03); }
-  #nodes-container { overflow-y: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; -ms-overflow-style: none; max-height: 480px; }
+  #nodes-container { overflow: visible; max-height: none; }
   #nodes-container::-webkit-scrollbar { display: none; }
   .terminal-body::-webkit-scrollbar, .drawer-content::-webkit-scrollbar { width: 4px; }
   .terminal-body::-webkit-scrollbar-thumb, .drawer-content::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.15); border-radius: 4px; }
@@ -181,16 +181,6 @@
         <div class="ios-card" style="padding: 24px; text-align: center; color: var(--text-muted); font-size: 14px;">正在加载节点...</div>
       </div>
 
-      <div class="logs-section-wrapper">
-        <div class="group-title middle-title">实时系统日志</div>
-        <div class="terminal-card">
-          <div class="terminal-header">
-            <span class="terminal-title">CONSOLE LOGS</span>
-            <button class="terminal-clear-btn" onclick="clearLogs()">清空日志</button>
-          </div>
-          <div class="terminal-body" id="logs">加载日志中...</div>
-        </div>
-      </div>
     </div>
 
     <!-- 移动端抽屉控制面板 -->
@@ -253,6 +243,16 @@
                 <button class="ios-btn ios-btn-secondary" style="height: 40px; font-size: 13px;" onclick="service('restart')">重启</button>
               </div>
             </div>
+          </div>
+        </div>
+        <div class="logs-section-wrapper">
+          <div class="group-title middle-title">实时系统日志</div>
+          <div class="terminal-card">
+            <div class="terminal-header">
+              <span class="terminal-title">CONSOLE LOGS</span>
+              <button class="terminal-clear-btn" onclick="clearLogs()">清空日志</button>
+            </div>
+            <div class="terminal-body" id="logs">加载日志中...</div>
           </div>
         </div>
       </div>
