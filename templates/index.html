@@ -420,14 +420,15 @@ async function getIPLocation(ip){
     if(ipLocationCache[ip]) return ipLocationCache[ip];
 
     try{
-        const res = await fetch("https://ipwho.is/" + encodeURIComponent(ip));
+        const res = await fetch("http://ip-api.com/json/" + encodeURIComponent(ip) + "?lang=zh-CN");
         const data = await res.json();
 
-        if(data && data.success){
+        if(data && data.status === "success"){
             let loc = (data.country || "");
-            if(data.city) loc += " " + data.city;
-            if(data.connection && data.connection.isp){
-                loc += " · " + data.connection.isp;
+            if(data.regionName) loc += " " + data.regionName;
+            if(data.city && data.city !== data.regionName) loc += " " + data.city;
+            if(data.isp){
+                loc += " · " + data.isp;
             }
             ipLocationCache[ip] = loc || "未知";
             return ipLocationCache[ip];
@@ -442,7 +443,7 @@ function refreshIPLocations(nodes){
     nodes.forEach(n=>{
         getIPLocation(n.ip).then(loc=>{
             const el=document.getElementById("location-"+n.ip);
-            if(el) el.innerText="📍 " + loc;
+            if(el) el.innerText=loc;
         });
     });
 }
@@ -497,7 +498,7 @@ async function refreshDashboard(isInitial = false) {
                 <div class="node-identity">
                   <span class="node-name" title="${escapeHtml(item.name || '未命名')}">${escapeHtml(item.name || '未命名')}</span>
                   <span class="node-ip" onclick="copyText('${escapeHtml(item.ip)}')">${escapeHtml(item.ip)}</span>
-                   <span class="node-location" id="location-${escapeHtml(item.ip)}">📍 查询归属地...</span>
+                   <span class="node-location" id="location-${escapeHtml(item.ip)}">查询归属地...</span>
                 </div>
                 <div style="display:flex; align-items:center; gap:12px;">
                   <span class="${badgeCls}">${escapeHtml(item.status)}</span>
