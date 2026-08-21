@@ -253,6 +253,23 @@
     .controls-sidebar .group-title:first-child { margin-top: 0; }
     .terminal-card { height: 260px; }
   }
+  .node-list-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .node-list-header .group-title { margin-right: 0; }
+  .node-sort-btn { height: 32px; padding: 0 12px; border: none; border-radius: 8px; background: #e5e5ea; color: var(--ios-blue); font-size: 12px; font-weight: 600; cursor: pointer; flex-shrink: 0; }
+  .node-sort-btn.active { background: var(--ios-blue); color: #fff; }
+  .node-cards-grid.sorting .node-card { cursor: grab; touch-action: none; }
+  .node-cards-grid.sorting .node-card:active { cursor: grabbing; }
+  .node-card.dragging { opacity: 0.45; transform: scale(0.985); }
+  .edit-modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.38); backdrop-filter: blur(5px); -webkit-backdrop-filter: blur(5px); display: none; align-items: center; justify-content: center; padding: 20px; z-index: 2100; }
+  .edit-modal-overlay.open { display: flex; }
+  .edit-modal { width: min(420px, 100%); background: var(--card-bg); border-radius: 16px; box-shadow: 0 18px 55px rgba(0,0,0,0.22); padding: 20px; }
+  .edit-modal-title { font-size: 18px; font-weight: 700; margin-bottom: 16px; }
+  .edit-modal-field { margin-bottom: 12px; }
+  .edit-modal-field label { display: block; font-size: 12px; color: var(--text-muted); font-weight: 600; margin-bottom: 6px; }
+  .edit-modal-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 16px; }
+  .edit-modal-actions button { height: 40px; border: none; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; }
+  .edit-cancel-btn { background: #e5e5ea; color: var(--text-main); }
+  .edit-save-btn { background: var(--ios-blue); color: #fff; }
   #toast {
     position: fixed; top: calc(env(safe-area-inset-top) + 20px); left: 50%;
     transform: translateX(-50%) translateY(-60px); background: rgba(0,0,0,0.85);
@@ -289,7 +306,10 @@
 
   <div class="dashboard-grid">
     <div class="main-section">
-      <div class="group-title">监控节点列表</div>
+      <div class="node-list-header">
+        <div class="group-title" style="margin-bottom:12px;">监控节点列表</div>
+        <button class="node-sort-btn" id="sort-toggle-btn" type="button" onclick="toggleSortMode()">排序</button>
+      </div>
       <div id="nodes-container">
         <div class="ios-card" style="padding: 24px; text-align: center; color: var(--text-muted); font-size: 14px;">正在加载节点...</div>
       </div>
@@ -376,6 +396,25 @@
 </div>
 
 <div class="drawer-overlay" id="drawer-overlay" onclick="toggleDrawer(false)"></div>
+
+<div class="edit-modal-overlay" id="edit-modal-overlay" onclick="if(event.target===this)closeEditModal()">
+  <div class="edit-modal">
+    <div class="edit-modal-title">编辑监控节点</div>
+    <div class="edit-modal-field">
+      <label for="edit-name">节点名称</label>
+      <input class="ios-input" id="edit-name" autocomplete="off">
+    </div>
+    <div class="edit-modal-field">
+      <label for="edit-ip">IP 地址或域名</label>
+      <input class="ios-input" id="edit-ip" autocomplete="off">
+    </div>
+    <div class="edit-modal-actions">
+      <button class="edit-cancel-btn" type="button" onclick="closeEditModal()">取消</button>
+      <button class="edit-save-btn" type="button" onclick="saveEditNode()">保存</button>
+    </div>
+  </div>
+</div>
+
 <div id="toast">提示信息</div>
 
 <script>
@@ -425,15 +464,16 @@ async function getIPLocation(ip){
     if(ipLocationCache[ip]) return ipLocationCache[ip];
 
     try{
-        const res = await fetch("http://ip-api.com/json/" + encodeURIComponent(ip) + "?lang=zh-CN");
+        const res = await fetch("https://api.ip.sb/geoip/" + encodeURIComponent(ip));
         const data = await res.json();
 
-        if(data && data.status === "success"){
+        if(data){
             let loc = (data.country || "");
-            if(data.regionName) loc += " " + data.regionName;
-            if(data.city && data.city !== data.regionName) loc += " " + data.city;
-            if(data.isp){
-                loc += " · " + data.isp;
+            if(data.region) loc += " " + data.region;
+            if(data.city && data.city !== data.region) loc += " " + data.city;
+            const isp = data.isp || data.organization || data.asn_organization;
+            if(isp){
+                loc += " · " + isp;
             }
             ipLocationCache[ip] = loc || "未知";
             return ipLocationCache[ip];
@@ -498,7 +538,7 @@ async function refreshDashboard(isInitial = false) {
             const failCount = parseInt(item.fail) || 0;
 
             return `
-            <div class="node-card">
+            <div class="node-card" data-ip="${escapeHtml(item.ip)}">
               <div class="node-top-row">
                 <div class="node-identity">
                   <span class="node-name" title="${escapeHtml(item.name || '未命名')}">${escapeHtml(item.name || '未命名')}</span>
@@ -516,6 +556,7 @@ async function refreshDashboard(isInitial = false) {
                   ${failCount > 0 ? `<span style="color:var(--ios-red);">连续失败: <strong style="color:var(--ios-red);">${failCount} 次</strong></span>` : ''}
                 </div>
                 <div class="node-action-group">
+                  <button class="ios-btn ios-btn-secondary" style="height:30px; padding:0 14px; font-size:12px; font-weight:600; width:auto;" onclick="openEditModal('${escapeHtml(item.ip)}')">编辑</button>
                   <button class="del-btn" onclick="delNode('${escapeHtml(item.ip)}')">删除</button>
                 </div>
               </div>
@@ -537,6 +578,12 @@ async function refreshDashboard(isInitial = false) {
             if (finalHTML !== lastRenderedHTML) {
                 container.innerHTML = finalHTML;
                 lastRenderedHTML = finalHTML;
+                const grid = container.querySelector(".node-cards-grid");
+                if (grid && sortMode) {
+                    grid.classList.add("sorting");
+                    grid.querySelectorAll(".node-card").forEach(card => { card.draggable = true; });
+                    bindSortEvents(grid);
+                }
             }
         }
     }
@@ -651,6 +698,156 @@ async function clearLogs(){
 function escapeHtml(str) {
     if (!str) return '';
     return String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+}
+
+
+let sortMode = false;
+let editingOriginalIP = "";
+let sortDragCard = null;
+let sortLongPressTimer = null;
+let sortDragging = false;
+
+function toggleSortMode() {
+    sortMode = !sortMode;
+    const btn = $("sort-toggle-btn");
+    btn.classList.toggle("active", sortMode);
+    btn.innerText = sortMode ? "完成排序" : "排序";
+    const grid = document.querySelector(".node-cards-grid");
+    if (grid) {
+        grid.classList.toggle("sorting", sortMode);
+        grid.querySelectorAll(".node-card").forEach(card => {
+            card.draggable = sortMode;
+        });
+        if (sortMode) bindSortEvents(grid);
+    }
+}
+
+function bindSortEvents(grid) {
+    if (grid.dataset.sortBound === "1") return;
+    grid.dataset.sortBound = "1";
+
+    grid.addEventListener("dragstart", e => {
+        if (!sortMode) { e.preventDefault(); return; }
+        const card = e.target.closest(".node-card");
+        if (!card) return;
+        sortDragCard = card;
+        card.classList.add("dragging");
+        e.dataTransfer.effectAllowed = "move";
+        e.dataTransfer.setData("text/plain", card.dataset.ip || "");
+    });
+
+    grid.addEventListener("dragend", async e => {
+        const card = e.target.closest(".node-card");
+        if (card) card.classList.remove("dragging");
+        sortDragCard = null;
+        await saveCurrentOrder(grid);
+    });
+
+    grid.addEventListener("dragover", e => {
+        if (!sortMode || !sortDragCard) return;
+        e.preventDefault();
+        const target = e.target.closest(".node-card");
+        if (!target || target === sortDragCard) return;
+        const rect = target.getBoundingClientRect();
+        const before = e.clientY < rect.top + rect.height / 2;
+        if (before) target.parentNode.insertBefore(sortDragCard, target);
+        else target.parentNode.insertBefore(sortDragCard, target.nextSibling);
+    });
+
+    grid.addEventListener("pointerdown", e => {
+        if (!sortMode || e.pointerType === "mouse") return;
+        const card = e.target.closest(".node-card");
+        if (!card) return;
+        if (e.target.closest("button")) return;
+        sortLongPressTimer = setTimeout(() => {
+            sortDragging = true;
+            sortDragCard = card;
+            card.classList.add("dragging");
+        }, 350);
+    });
+
+    grid.addEventListener("pointermove", e => {
+        if (!sortMode || !sortDragging || !sortDragCard) return;
+        e.preventDefault();
+        const el = document.elementFromPoint(e.clientX, e.clientY);
+        const target = el && el.closest ? el.closest(".node-card") : null;
+        if (!target || target === sortDragCard || target.parentNode !== grid) return;
+        const rect = target.getBoundingClientRect();
+        const before = e.clientY < rect.top + rect.height / 2;
+        if (before) grid.insertBefore(sortDragCard, target);
+        else grid.insertBefore(sortDragCard, target.nextSibling);
+    });
+
+    const finishPointerSort = async () => {
+        clearTimeout(sortLongPressTimer);
+        sortLongPressTimer = null;
+        if (!sortDragging) return;
+        sortDragging = false;
+        if (sortDragCard) sortDragCard.classList.remove("dragging");
+        sortDragCard = null;
+        await saveCurrentOrder(grid);
+    };
+    grid.addEventListener("pointerup", finishPointerSort);
+    grid.addEventListener("pointercancel", finishPointerSort);
+}
+
+async function saveCurrentOrder(grid) {
+    if (!sortMode || !grid) return;
+    const nodes = Array.from(grid.querySelectorAll(".node-card")).map(card => ({
+        ip: card.dataset.ip
+    }));
+    if (!nodes.length) return;
+
+    const result = await apiPost("/api/reorder", { nodes }, "排序已保存");
+    if (!result) {
+        showToast("排序保存失败");
+        await refreshDashboard();
+    }
+}
+
+async function openEditModal(ip) {
+    const config = await fetchJSON("/api/config");
+    const node = config && (config.nodes || []).find(n => n.ip === ip);
+    if (!node) {
+        showToast("未找到该节点");
+        return;
+    }
+    editingOriginalIP = ip;
+    $("edit-name").value = node.name || "";
+    $("edit-ip").value = node.ip || "";
+    $("edit-modal-overlay").classList.add("open");
+    setTimeout(() => $("edit-name").focus(), 50);
+}
+
+function closeEditModal() {
+    editingOriginalIP = "";
+    $("edit-modal-overlay").classList.remove("open");
+}
+
+async function saveEditNode() {
+    const name = $("edit-name").value.trim();
+    const ip = $("edit-ip").value.trim();
+
+    if (!ip) {
+        showToast("请输入有效的 IP 地址或域名");
+        return;
+    }
+    if (!editingOriginalIP) {
+        closeEditModal();
+        return;
+    }
+
+    const result = await apiPost("/api/edit", {
+        old_ip: editingOriginalIP,
+        name,
+        ip
+    }, "节点信息已更新");
+
+    if (result) {
+        delete ipLocationCache[editingOriginalIP];
+        delete ipLocationCache[ip];
+        closeEditModal();
+    }
 }
 
 const drawer = $("drawer"), overlay = $("drawer-overlay"), headerArea = $("drawer-header-area"), drawerContent = $("drawer-content");
