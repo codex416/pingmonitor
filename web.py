@@ -175,6 +175,101 @@ def delete_node():
         return jsonify({"ok": False, "error": str(e)})
 
 
+@app.route("/api/edit", methods=["POST"])
+def edit_node():
+    try:
+        data = request.get_json(silent=True) or {}
+        old_ip = str(data.get("old_ip", "")).strip()
+        new_ip = str(data.get("ip", "")).strip()
+        new_name = str(data.get("name", "")).strip() or new_ip
+
+        if not old_ip or not new_ip:
+            write_log("编辑节点失败: IP或域名不能为空")
+            return jsonify({"ok": False, "msg": "IP或域名不能为空"})
+
+        cfg = load_config()
+        nodes = cfg.get("nodes", [])
+        target = next((n for n in nodes if n.get("ip") == old_ip), None)
+
+        if target is None:
+            write_log(f"编辑节点失败: 未找到节点 [{old_ip}]")
+            return jsonify({"ok": False, "msg": "未找到节点"})
+
+        if new_ip != old_ip and any(n.get("ip") == new_ip for n in nodes):
+            write_log(f"编辑节点失败: 节点 [{new_ip}] 已存在")
+            return jsonify({"ok": False, "msg": "新 IP/域名已存在"})
+
+        target["name"] = new_name
+        target["ip"] = new_ip
+        save_json_atomic(CONFIG_FILE, cfg)
+
+        # IP 改变后清理旧状态，避免旧 IP 残留在面板。
+        if old_ip != new_ip and os.path.exists(STATUS_FILE):
+            try:
+                with open(STATUS_FILE, "r", encoding="utf-8") as f:
+                    status = json.load(f)
+                if old_ip in status:
+                    del status[old_ip]
+                    save_json_atomic(STATUS_FILE, status)
+            except Exception as e:
+                print(f"[Warning] 编辑节点清理旧状态失败: {e}")
+
+        # 仅修改名称时，同步现有状态中的名称。
+        if old_ip == new_ip and os.path.exists(STATUS_FILE):
+            try:
+                with open(STATUS_FILE, "r", encoding="utf-8") as f:
+                    status = json.load(f)
+                if new_ip in status:
+                    status[new_ip]["name"] = new_name
+                    status[new_ip]["ip"] = new_ip
+                    save_json_atomic(STATUS_FILE, status)
+            except Exception as e:
+                print(f"[Warning] 编辑节点同步状态失败: {e}")
+
+        write_log(f"编辑节点成功: [{old_ip}] -> 名称=[{new_name}], IP/域名=[{new_ip}]")
+        return jsonify({"ok": True})
+    except Exception as e:
+        write_log(f"编辑节点异常: {str(e)}")
+        return jsonify({"ok": False, "error": str(e)})
+
+
+@app.route("/api/reorder", methods=["POST"])
+def reorder_nodes():
+    try:
+        data = request.get_json(silent=True) or {}
+        order = data.get("nodes", [])
+
+        if not isinstance(order, list):
+            return jsonify({"ok": False, "msg": "排序数据格式错误"})
+
+        cfg = load_config()
+        current_nodes = cfg.get("nodes", [])
+
+        current_ips = [str(n.get("ip", "")).strip() for n in current_nodes]
+        requested_ips = []
+        for item in order:
+            if isinstance(item, dict):
+                ip = str(item.get("ip", "")).strip()
+            else:
+                ip = str(item).strip()
+            if ip:
+                requested_ips.append(ip)
+
+        # 必须与现有节点完全一致，防止排序请求意外增删节点。
+        if len(requested_ips) != len(current_ips) or set(requested_ips) != set(current_ips):
+            return jsonify({"ok": False, "msg": "排序数据与当前节点不一致"})
+
+        node_map = {str(n.get("ip", "")).strip(): n for n in current_nodes}
+        cfg["nodes"] = [node_map[ip] for ip in requested_ips]
+        save_json_atomic(CONFIG_FILE, cfg)
+
+        write_log("监控节点排序已更新")
+        return jsonify({"ok": True})
+    except Exception as e:
+        write_log(f"监控节点排序异常: {str(e)}")
+        return jsonify({"ok": False, "error": str(e)})
+
+
 @app.route("/api/worker", methods=["POST"])
 def worker():
     try:
