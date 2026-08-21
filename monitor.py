@@ -145,15 +145,20 @@ class Monitor:
         while True:
             cfg = self.load_config()
 
-            # 节点已被删除检查
-            exists = any(n.get("ip") == ip for n in cfg.get("nodes", []))
+            # 每轮读取最新节点信息，支持网页端直接修改节点名称。
+            current_node = next((n for n in cfg.get("nodes", []) if n.get("ip") == ip), None)
 
-            if not exists:
+            # 节点已被删除或 IP 已被修改：结束旧 IP 的监控线程。
+            if not current_node:
                 self.delete_status(ip)
-                self.log(f"{name} 已删除")
+                self.log(f"{name} 已删除或 IP 已修改")
                 if ip in self.running_nodes:
                     del self.running_nodes[ip]
                 break
+
+            # 名称修改后立即采用最新名称，IP 不变时监控线程继续复用。
+            node = current_node
+            name = node.get("name", ip)
 
             interval = cfg.get("interval", 60)
             worker = cfg.get("worker", "")
