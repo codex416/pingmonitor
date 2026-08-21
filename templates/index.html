@@ -9,23 +9,24 @@
 <title>PingMonitor</title>
 <style>
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-  :root {
-    --ios-bg: #f2f2f7; --card-bg: #ffffff; --text-main: #000000; --text-muted: #8e8e93;
-    --ios-blue: #007aff; --ios-green: #34c759; --ios-red: #ff3b30; --ios-orange: #ff9500;
-    --card-radius: 14px; --divider-color: rgba(60, 60, 67, 0.12);
-  }
   html, body {
     margin: 0; padding: 0; width: 100%; min-height: 100%;
     background-color: var(--ios-bg) !important; color: var(--text-main);
     font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Segoe UI", Roboto, "PingFang SC", sans-serif;
     -webkit-font-smoothing: antialiased; overscroll-behavior-y: none;
+    overflow-x: hidden;
+  }
+  :root {
+    --ios-bg: #f2f2f7; --card-bg: #ffffff; --text-main: #1c1c1e; --text-muted: #8e8e93;
+    --ios-blue: #007aff; --ios-green: #34c759; --ios-red: #ff3b30; --ios-orange: #ff9500;
+    --card-radius: 14px; --divider-color: rgba(60, 60, 67, 0.08);
   }
   body.drawer-open {
     overflow: hidden !important;
     position: fixed;
     width: 100%;
   }
-  .main-wrapper { max-width: 1320px; margin: 0 auto; padding: 0 20px calc(80px + env(safe-area-inset-bottom)); background-color: var(--ios-bg); }
+  .main-wrapper { max-width: 1320px; margin: 0 auto; padding: 0 20px calc(80px + env(safe-area-inset-bottom)); background-color: var(--ios-bg); width: 100%; overflow: hidden; }
   .ios-large-header { padding-top: calc(env(safe-area-inset-top) + 20px); padding-bottom: 12px; cursor: pointer; user-select: none; }
   .large-title { font-size: 32px; font-weight: 800; letter-spacing: -0.6px; color: var(--text-main); line-height: 1.1; }
   .header-sub-row { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
@@ -33,56 +34,248 @@
   .last-update-text { font-size: 13px; color: var(--text-muted); font-weight: 400; }
   .desktop-control-btn { display: none; }
   
-  /* 基础区块标题 */
   .group-title { font-size: 13px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: -0.1px; margin: 24px 2px 12px; }
   .group-title.middle-title { margin-top: 36px !important; margin-bottom: 12px !important; }
   
   .widget-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
   @media (min-width: 768px) { .widget-grid { grid-template-columns: repeat(4, 1fr); gap: 16px; } }
-  @media (min-width: 992px) {
-    .node-cards-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
-  }
+  
   .widget-card { background: var(--card-bg); border-radius: var(--card-radius); padding: 16px 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.03); display: flex; flex-direction: column; justify-content: space-between; height: 90px; }
   .widget-lbl { font-size: 13px; color: var(--text-muted); font-weight: 500; }
   .widget-val { font-size: 28px; font-weight: 700; letter-spacing: -0.8px; line-height: 1; }
   .ios-card { background: var(--card-bg); border-radius: var(--card-radius); overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.03); }
-  #nodes-container { overflow: visible; max-height: none; }
-  #nodes-container::-webkit-scrollbar { display: none; }
-  .terminal-body::-webkit-scrollbar, .drawer-content::-webkit-scrollbar { width: 4px; }
-  .terminal-body::-webkit-scrollbar-thumb, .drawer-content::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.15); border-radius: 4px; }
-  .node-cards-grid { display: grid; grid-template-columns: 1fr; gap: 12px; }
-  .node-card { background: var(--card-bg); border-radius: var(--card-radius); padding: 16px 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.03); display: flex; flex-direction: column; gap: 12px; transition: transform 0.2s ease, box-shadow 0.2s ease; }
-  .node-top-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-  .node-identity { display: flex; flex-direction: column; gap: 3px; min-width: 0; flex: 1; }
-  .node-name { font-size: 17px; font-weight: 700; line-height: 1.25; color: var(--text-main); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .node-ip { font-size: 13px; color: var(--text-muted); font-family: SFMono-Regular, Monaco, Consolas, monospace; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; width: fit-content; }
-  .node-ip:hover { color: var(--ios-blue); text-decoration: underline; }
-  .node-device-icons { font-size: 13px; color: var(--text-muted); margin-left: 4px; }
-  .node-device-icons span { margin-right: 4px; }
-  .node-location { font-size: 12px; color: var(--text-muted); line-height: 1.3; }
+  #nodes-container { overflow: hidden; max-height: none; width: 100%; }
 
-  .node-bottom-row { display: flex; align-items: center; justify-content: space-between; padding-top: 10px; border-top: 0.5px solid var(--divider-color); }
-  .node-stats-group { display: flex; align-items: center; gap: 16px; font-size: 12px; color: var(--text-muted); }
-  .stat-val { font-weight: 600; color: var(--text-main); }
-  .node-action-group { display: flex; align-items: center; gap: 12px; }
-  .badge-online { color: #248a3d; background: rgba(52,199,89,0.15); padding: 4px 12px; border-radius: 6px; font-size: 12px; font-weight: 600; white-space: nowrap; }
-  .badge-offline { color: var(--ios-red); background: rgba(255,59,48,0.15); padding: 4px 12px; border-radius: 6px; font-size: 12px; font-weight: 600; white-space: nowrap; }
-  .badge-checking { color: var(--ios-blue); background: rgba(0,122,255,0.15); padding: 4px 12px; border-radius: 6px; font-size: 12px; font-weight: 600; white-space: nowrap; }
-  .delay-text { font-size: 15px; font-weight: 700; font-family: SFMono-Regular, Monaco, Consolas, monospace; }
-  .delay-good { color: var(--ios-green); }
+  .node-cards-grid { display: grid; grid-template-columns: 1fr; gap: 12px; width: 100%; box-sizing: border-box; }
+  @media (min-width: 992px) {
+    .node-cards-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+  }
+
+  .node-card {
+    background: var(--card-bg);
+    border-radius: var(--card-radius);
+    padding: 16px 18px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.025);
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    position: relative;
+    border: 1px solid rgba(0,0,0,0.03);
+    transition: transform 0.22s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.22s ease, padding 0.25s ease;
+    width: 100%;
+    box-sizing: border-box;
+    overflow: hidden;
+  }
+
+  .node-top-row {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    width: 100%;
+  }
+  .node-identity {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+    flex: 1;
+  }
+  .node-name {
+    font-size: 16px;
+    font-weight: 700;
+    line-height: 1.25;
+    color: var(--text-main);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .node-sub-info {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+    font-size: 12px;
+    color: var(--text-muted);
+    width: 100%;
+  }
+  .node-ip {
+    font-family: SFMono-Regular, Monaco, Consolas, monospace;
+    font-weight: 500;
+    color: #636366;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: rgba(120, 120, 128, 0.08);
+    padding: 2px 6px;
+    border-radius: 5px;
+    transition: all 0.15s ease;
+    flex-shrink: 0;
+  }
+  .node-ip:hover {
+    color: var(--ios-blue);
+    background: rgba(0, 122, 255, 0.1);
+  }
+  .node-ip::after {
+    content: '';
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%20%238e8e93' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='9' y='9' width='13' height='13' rx='2' ry='2'%3E%3C/rect%3E%3Cpath d='M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1'%3E%3C/path%3E%3C/svg%3E");
+    background-size: contain;
+    background-repeat: no-repeat;
+    opacity: 0.6;
+  }
+
+  /* ----------------------------------------------------
+     修改：归属地独立占满第二行、超过部分截断可点击展开
+  ---------------------------------------------------- */
+  .node-location {
+    font-size: 12px;
+    color: #8e8e93;
+    display: block;
+    width: 100%;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    cursor: pointer;
+    user-select: none;
+    transition: color 0.15s ease;
+    margin-top: 1px;
+  }
+  .node-location:hover {
+    color: var(--ios-blue);
+  }
+  /* 点击展开状态：解除单行截断限制 */
+  .node-location.expanded {
+    white-space: normal;
+    word-break: break-all;
+  }
+
+  .node-status-wrapper {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 4px;
+    flex-shrink: 0;
+  }
+  .badge-status-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  .badge-status-pill .dot { width: 6px; height: 6px; border-radius: 50%; }
+  .badge-online { color: #248a3d; background: rgba(52,199,89,0.12); }
+  .badge-online .dot { background: var(--ios-green); box-shadow: 0 0 6px rgba(52,199,89,0.6); }
+  .badge-offline { color: var(--ios-red); background: rgba(255,59,48,0.12); }
+  .badge-offline .dot { background: var(--ios-red); box-shadow: 0 0 6px rgba(255,59,48,0.6); }
+  .badge-checking { color: var(--ios-blue); background: rgba(0,122,255,0.12); }
+  .badge-checking .dot { background: var(--ios-blue); }
+
+  .delay-text {
+    font-size: 14px;
+    font-weight: 700;
+    font-family: SFMono-Regular, Monaco, Consolas, monospace;
+    letter-spacing: -0.3px;
+  }
+  .delay-good { color: #30d158; }
   .delay-medium { color: var(--ios-orange); }
   .delay-bad { color: var(--ios-red); }
-  .del-btn { background: rgba(255,59,48,0.1); color: var(--ios-red); border: none; height: 30px; padding: 0 14px; font-size: 12px; font-weight: 600; border-radius: 6px; cursor: pointer; white-space: nowrap; transition: background 0.2s; }
-  .del-btn:hover { background: rgba(255,59,48,0.2); }
+
+  .node-bottom-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-top: 10px;
+    border-top: 1px solid var(--divider-color);
+    width: 100%;
+  }
+  .node-stats-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    color: var(--text-muted);
+    flex-wrap: wrap;
+  }
+  .stat-val { font-weight: 600; color: #3a3a3c; }
+  .fail-tag {
+    color: var(--ios-red);
+    background: rgba(255,59,48,0.08);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-weight: 600;
+  }
+
+  .node-action-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+  }
+  .action-btn-sm {
+    height: 28px;
+    padding: 0 10px;
+    font-size: 12px;
+    font-weight: 600;
+    border-radius: 6px;
+    border: none;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .edit-btn { background: #f2f2f7; color: var(--ios-blue); }
+  .del-btn { background: rgba(255,59,48,0.08); color: var(--ios-red); }
+
+  .node-list-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .node-list-header .group-title { margin-right: 0; }
+  .node-sort-btn { height: 30px; padding: 0 14px; border: none; border-radius: 8px; background: #e5e5ea; color: var(--ios-blue); font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.2s; flex-shrink: 0; }
+  .node-sort-btn.active { background: var(--ios-blue); color: #fff; }
+  
+  .node-sort-handle {
+    display: none;
+    position: absolute;
+    left: 4px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 32px;
+    height: 40px;
+    border: none;
+    background: transparent;
+    color: #a1a1a6;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 3px;
+    cursor: grab;
+    touch-action: none;
+    user-select: none;
+    -webkit-user-select: none;
+    border-radius: 6px;
+    z-index: 2;
+  }
+  .node-sort-handle span { display: block; width: 16px; height: 2px; border-radius: 2px; background: currentColor; }
+  
+  .node-cards-grid.sorting .node-sort-handle { display: flex; }
+  .node-cards-grid.sorting .node-card { 
+    padding-left: 38px !important;
+    border: 1px dashed rgba(0,122,255,0.4);
+  }
+  .node-card.dragging { opacity: 0.6; transform: scale(0.98); box-shadow: 0 10px 25px rgba(0,0,0,0.12); background: #fdfdfd; }
 
   .empty-pc { display: none; }
   .empty-mobile { display: inline; }
   @media (min-width: 992px) {
     .empty-pc { display: inline; }
     .empty-mobile { display: none; }
-    .node-card { flex-direction: row; align-items: center; justify-content: space-between; padding: 16px 20px; height: 90px; gap: 24px; }
-    .node-top-row { flex: 1; border-top: none; padding-top: 0; }
-    .node-bottom-row { border-top: none; padding-top: 0; gap: 28px; }
   }
 
   .input-group { padding: 16px; display: flex; flex-direction: column; gap: 12px; }
@@ -114,24 +307,12 @@
       max-height: 720px; background: #f2f2f7; border-top-left-radius: 20px; border-top-right-radius: 20px;
       box-shadow: 0 -6px 25px rgba(0,0,0,0.12); z-index: 1000;
       transform: translate3d(0, 100%, 0);
-      visibility: hidden;
-      pointer-events: none;
-      will-change: transform;
+      visibility: hidden; pointer-events: none; will-change: transform;
       transition: transform 0.32s cubic-bezier(0.16, 1, 0.3, 1), visibility 0.32s;
-      display: flex; flex-direction: column;
-      touch-action: none;
+      display: flex; flex-direction: column; touch-action: none;
     }
-    .bottom-drawer.open {
-      transform: translate3d(0, 0, 0) !important;
-      visibility: visible !important;
-      pointer-events: auto !important;
-    }
-    .bottom-drawer.closed {
-      transform: translate3d(0, 100%, 0) !important;
-      visibility: hidden !important;
-      pointer-events: none !important;
-    }
-    .bottom-drawer.dragging { transition: none !important; }
+    .bottom-drawer.open { transform: translate3d(0, 0, 0) !important; visibility: visible !important; pointer-events: auto !important; }
+    .bottom-drawer.closed { transform: translate3d(0, 100%, 0) !important; visibility: hidden !important; pointer-events: none !important; }
     .drawer-header-area { flex-shrink: 0; cursor: grab; user-select: none; padding-bottom: 4px; background: #f2f2f7; border-top-left-radius: 20px; border-top-right-radius: 20px; }
     .drawer-header { height: 22px; display: flex; align-items: center; justify-content: center; }
     .drawer-pill { width: 36px; height: 5px; border-radius: 3px; background: rgba(60,60,67,0.3); }
@@ -139,267 +320,35 @@
     .drawer-title { font-size: 16px; font-weight: 700; }
     .drawer-content { flex: 1; overflow-y: auto; padding: 0 16px calc(40px + env(safe-area-inset-bottom)); -webkit-overflow-scrolling: touch; touch-action: pan-y; }
   }
+
   @media (min-width: 992px) {
     .desktop-control-btn {
-      display: flex;
-      position: absolute;
-      top: 24px;
-      right: 20px;
-      height: 38px;
-      padding: 0 16px;
-      align-items: center;
-      justify-content: center;
-      border: none;
-      border-radius: 10px;
-      background: var(--ios-blue);
-      color: #fff;
-      font-size: 13px;
-      font-weight: 600;
-      cursor: pointer;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-      z-index: 5;
+      display: flex; position: absolute; top: 24px; right: 20px; height: 38px; padding: 0 16px;
+      align-items: center; justify-content: center; border: none; border-radius: 10px;
+      background: var(--ios-blue); color: #fff; font-size: 13px; font-weight: 600; cursor: pointer;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08); z-index: 5;
     }
     .main-wrapper { position: relative; }
-
-    .drawer-overlay {
-      display: none !important;
-      position: fixed !important;
-      inset: 0 !important;
-      width: 100vw !important;
-      height: 100vh !important;
-      background: rgba(0,0,0,0.35) !important;
-      opacity: 0 !important;
-      visibility: hidden !important;
-      pointer-events: none !important;
-      z-index: 1900 !important;
-    }
-    .drawer-overlay.open {
-      display: block !important;
-      opacity: 1 !important;
-      visibility: visible !important;
-      pointer-events: auto !important;
-    }
-
+    .drawer-overlay { display: none !important; }
     .bottom-drawer {
-      position: fixed !important;
-      top: 50% !important;
-      left: 50% !important;
-      bottom: auto !important;
-      width: min(720px, calc(100vw - 48px)) !important;
-      height: min(780px, calc(100vh - 48px)) !important;
-      max-height: none !important;
-      transform: translate(-50%, -50%) scale(0.96) !important;
-      visibility: hidden !important;
-      pointer-events: none !important;
-      opacity: 0 !important;
-      background: #f2f2f7 !important;
-      border-radius: 18px !important;
-      box-shadow: 0 18px 55px rgba(0,0,0,0.22) !important;
-      z-index: 2000 !important;
-      display: flex !important;
-      flex-direction: column !important;
+      position: fixed !important; top: 50% !important; left: 50% !important; bottom: auto !important;
+      width: min(720px, calc(100vw - 48px)) !important; height: min(780px, calc(100vh - 48px)) !important;
+      transform: translate(-50%, -50%) scale(0.96) !important; visibility: hidden !important;
+      pointer-events: none !important; opacity: 0 !important; background: #f2f2f7 !important;
+      border-radius: 18px !important; box-shadow: 0 18px 55px rgba(0,0,0,0.22) !important;
+      z-index: 2000 !important; display: flex !important; flex-direction: column !important;
       transition: opacity 0.2s ease, transform 0.2s ease, visibility 0.2s ease !important;
       overflow: hidden !important;
     }
-    .bottom-drawer.open {
-      transform: translate(-50%, -50%) scale(1) !important;
-      visibility: visible !important;
-      pointer-events: auto !important;
-      opacity: 1 !important;
-    }
-    .bottom-drawer.closed {
-      transform: translate(-50%, -50%) scale(0.96) !important;
-      visibility: hidden !important;
-      pointer-events: none !important;
-      opacity: 0 !important;
-    }
-    .drawer-header-area {
-      display: block !important;
-      flex-shrink: 0;
-      cursor: default !important;
-      padding-bottom: 4px;
-      background: #f2f2f7;
-      border-top-left-radius: 18px;
-      border-top-right-radius: 18px;
-    }
+    .bottom-drawer.open { transform: translate(-50%, -50%) scale(1) !important; visibility: visible !important; pointer-events: auto !important; opacity: 1 !important; }
+    .drawer-header-area { flex-shrink: 0; cursor: default !important; padding-bottom: 4px; background: #f2f2f7; }
     .drawer-header { height: 22px; }
     .drawer-title-bar { padding: 4px 20px 14px; }
-    .drawer-close-btn {
-      display: flex !important;
-      width: 32px;
-      height: 32px;
-      align-items: center;
-      justify-content: center;
-      border: none;
-      border-radius: 8px;
-      background: #e5e5ea;
-      color: var(--text-main);
-      font-size: 20px;
-      line-height: 1;
-      cursor: pointer;
-    }
-    .drawer-content {
-      flex: 1 !important;
-      display: flex !important;
-      flex-direction: column !important;
-      padding: 0 16px calc(24px + env(safe-area-inset-bottom)) !important;
-      overflow-y: auto !important;
-    }
-    .controls-sidebar { display: flex; flex-direction: column; }
-    .logs-section-wrapper { display: flex; flex-direction: column; }
+    .drawer-content { flex: 1 !important; display: flex !important; flex-direction: column !important; padding: 0 16px 24px !important; overflow-y: auto !important; }
+    .controls-sidebar, .logs-section-wrapper { display: flex; flex-direction: column; }
     .dashboard-grid { display: block; margin-top: 10px; }
     .main-section { display: flex; flex-direction: column; }
-    .main-section .group-title:first-child { margin-top: 0; }
-    .controls-sidebar .group-title:first-child { margin-top: 0; }
     .terminal-card { height: 260px; }
-  }
-  .node-list-header {
-    position: relative;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-    min-height: 36px;
-  }
-  .node-list-header .group-title { margin-right: 0; }
-
-  .node-sort-btn {
-    height: 32px;
-    min-width: 58px;
-    padding: 0 13px;
-    border: 0.5px solid rgba(0,122,255,0.18);
-    border-radius: 9px;
-    background: rgba(0,122,255,0.08);
-    color: var(--ios-blue);
-    font-size: 12px;
-    font-weight: 600;
-    cursor: pointer;
-    flex: 0 0 auto;
-    transition: background .2s ease, color .2s ease, border-color .2s ease, transform .15s ease;
-  }
-  .node-sort-btn:hover { background: rgba(0,122,255,0.13); }
-  .node-sort-btn:active { transform: scale(.96); }
-  .node-sort-btn.active {
-    background: var(--ios-blue);
-    border-color: var(--ios-blue);
-    color: #fff;
-  }
-
-  .sort-hint {
-    display: none;
-    align-items: center;
-    gap: 7px;
-    margin: -2px 2px 10px;
-    font-size: 11px;
-    color: var(--text-muted);
-    animation: sortHintIn .22s ease both;
-  }
-  .sort-hint.show { display: flex; }
-  .sort-hint-dot {
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    background: var(--ios-blue);
-    box-shadow: 0 0 0 4px rgba(0,122,255,.08);
-    flex: 0 0 auto;
-  }
-  @keyframes sortHintIn {
-    from { opacity: 0; transform: translateY(-3px); }
-    to { opacity: 1; transform: translateY(0); }
-  }
-
-  .node-card { position: relative; }
-
-  /* 三横手柄：精致、紧凑，不占用卡片布局空间 */
-  .node-sort-handle {
-    display: none;
-    position: absolute;
-    left: 10px;
-    top: 50%;
-    transform: translateY(-50%);
-    width: 34px;
-    height: 42px;
-    padding: 0;
-    border: 0.5px solid rgba(60,60,67,0.10);
-    border-radius: 10px;
-    background: rgba(242,242,247,0.94);
-    color: #8e8e93;
-    align-items: center;
-    justify-content: center;
-    flex-direction: column;
-    gap: 4px;
-    cursor: grab;
-    touch-action: none;
-    user-select: none;
-    -webkit-user-select: none;
-    box-shadow: 0 1px 4px rgba(0,0,0,.04);
-    z-index: 5;
-    transition: background .18s ease, color .18s ease, box-shadow .18s ease, transform .18s ease;
-  }
-  .node-sort-handle span {
-    display: block;
-    width: 15px;
-    height: 2px;
-    border-radius: 3px;
-    background: currentColor;
-  }
-  .node-sort-handle:hover {
-    color: var(--ios-blue);
-    background: rgba(0,122,255,.08);
-    box-shadow: 0 3px 10px rgba(0,122,255,.10);
-  }
-  .node-sort-handle.grabbing,
-  .node-sort-handle:active {
-    cursor: grabbing;
-    color: var(--ios-blue);
-    background: rgba(0,122,255,.12);
-    transform: translateY(-50%) scale(1.04);
-  }
-
-  /* 排序模式视觉反馈：卡片不改变尺寸、不增加 padding */
-  .node-cards-grid.sorting .node-sort-handle { display: flex; }
-  .node-cards-grid.sorting .node-card {
-    outline: 1px solid rgba(0,122,255,.08);
-    box-shadow: 0 3px 12px rgba(0,0,0,.045);
-  }
-  .node-cards-grid.sorting .node-card::after {
-    content: "";
-    position: absolute;
-    inset: 0;
-    border: 1px dashed rgba(0,122,255,.12);
-    border-radius: var(--card-radius);
-    pointer-events: none;
-  }
-  .node-card.dragging {
-    opacity: .96;
-    transform: scale(1.018);
-    box-shadow: 0 14px 32px rgba(0,0,0,.16);
-    outline: 1.5px solid rgba(0,122,255,.30) !important;
-    z-index: 20;
-    transition: none !important;
-  }
-  .node-card.dragging .node-sort-handle {
-    color: var(--ios-blue);
-    background: rgba(0,122,255,.12);
-    box-shadow: 0 4px 12px rgba(0,122,255,.12);
-  }
-
-  @media (max-width: 991px) {
-    .node-list-header { gap: 8px; }
-    .node-sort-btn {
-      height: 34px;
-      min-width: 62px;
-      padding: 0 14px;
-      border-radius: 10px;
-    }
-    .sort-hint { margin-bottom: 9px; font-size: 11px; }
-    .node-sort-handle {
-      left: 8px;
-      width: 36px;
-      height: 44px;
-      border-radius: 11px;
-    }
-    .node-sort-handle span { width: 16px; }
   }
 
   .edit-modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.38); backdrop-filter: blur(5px); -webkit-backdrop-filter: blur(5px); display: none; align-items: center; justify-content: center; padding: 20px; z-index: 2100; }
@@ -421,16 +370,15 @@
   }
   #toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
 </style>
-   <link rel="icon" type="image/webp" sizes="32x32" href="https://free.boltp.com/2026/08/06/6a744b5ca9f18.webp">
-   <link rel="shortcut icon" href="https://free.boltp.com/2026/08/06/6a744b5ca9f18.webp">
-   <link rel="apple-touch-icon" sizes="180x180" href="https://free.boltp.com/2026/08/06/6a744b5ca9f18.webp">
+<link rel="icon" type="image/webp" sizes="32x32" href="https://free.boltp.com/2026/08/06/6a744b5ca9f18.webp">
+<link rel="shortcut icon" href="https://free.boltp.com/2026/08/06/6a744b5ca9f18.webp">
+<link rel="apple-touch-icon" sizes="180x180" href="https://free.boltp.com/2026/08/06/6a744b5ca9f18.webp">
 </head>
 <body>
 
 <div class="main-wrapper" id="main-content">
-  <!-- 点击顶部主标题可触发移动端控制台抽屉的展开/收起 -->
   <button class="desktop-control-btn" type="button" onclick="toggleDrawer(true)">控制面板</button>
-  <div class="ios-large-header" onclick="toggleDrawer()" title="点击打开控制面板">
+  <div class="ios-large-header" onclick="if(window.innerWidth<992)toggleDrawer()" title="点击打开控制面板">
     <div class="large-title">PingMonitor</div>
     <div class="header-sub-row">
       <span class="status-dot" id="header-dot"></span>
@@ -452,17 +400,11 @@
         <div class="group-title" style="margin-bottom:12px;">监控节点列表</div>
         <button class="node-sort-btn" id="sort-toggle-btn" type="button" onclick="toggleSortMode()">排序</button>
       </div>
-      <div class="sort-hint" id="sort-hint">
-        <span class="sort-hint-dot"></span>
-        <span>拖动卡片左侧手柄调整顺序</span>
-      </div>
       <div id="nodes-container">
         <div class="ios-card" style="padding: 24px; text-align: center; color: var(--text-muted); font-size: 14px;">正在加载节点...</div>
       </div>
-
     </div>
 
-    <!-- 移动端抽屉控制面板 -->
     <div class="bottom-drawer closed" id="drawer">
       <div class="drawer-header-area" id="drawer-header-area" onclick="toggleDrawer()">
         <div class="drawer-header"><div class="drawer-pill"></div></div>
@@ -515,7 +457,7 @@
                   <div style="font-size: 14px; font-weight: 600;">后台运行状态</div>
                   <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">运行时间: <span id="service-uptime" style="font-family: monospace; font-weight: 600;">--:--:--</span></div>
                 </div>
-                <span class="badge-online" id="service-status-badge">检测中</span>
+                <span class="badge-status-pill badge-online" id="service-status-badge"><i class="dot"></i>检测中</span>
               </div>
               <div style="height: 0.5px; background: var(--divider-color);"></div>
               <div style="padding: 16px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: auto;">
@@ -564,9 +506,12 @@
 <div id="toast">提示信息</div>
 
 <script>
-const USE_MOCK = false;
 let lastRenderedHTML = "", lastLogsText = "";
 const $ = id => document.getElementById(id);
+
+function toggleLocation(el) {
+    el.classList.toggle("expanded");
+}
 
 function formatUptime(s) {
     if (s < 0) s = 0;
@@ -603,67 +548,102 @@ async function fetchJSON(url) {
     try { const res = await fetch(url); return res.ok ? await res.json() : null; } catch { return null; }
 }
 
-
 const ipLocationCache = {};
-
 const countryZh = {
-    CN:"中国", HK:"中国香港", MO:"中国澳门", TW:"中国台湾", JP:"日本", KR:"韩国", SG:"新加坡", US:"美国", CA:"加拿大", GB:"英国",
-    DE:"德国", FR:"法国", NL:"荷兰", RU:"俄罗斯", AU:"澳大利亚", NZ:"新西兰", IN:"印度", MY:"马来西亚", TH:"泰国",
-    VN:"越南", ID:"印度尼西亚", PH:"菲律宾", AE:"阿联酋", TR:"土耳其", BR:"巴西", AR:"阿根廷", MX:"墨西哥",
-    IT:"意大利", ES:"西班牙", SE:"瑞典", CH:"瑞士", NO:"挪威", FI:"芬兰", DK:"丹麦", PL:"波兰", UA:"乌克兰",
-    IE:"爱尔兰", AT:"奥地利", BE:"比利时", CZ:"捷克", RO:"罗马尼亚", ZA:"南非", IL:"以色列"
+    CN:"中国", HK:"中国香港", MO:"中国澳门", TW:"中国台湾", JP:"日本", KR:"韩国", SG:"新加坡",
+    US:"美国", CA:"加拿大", GB:"英国", DE:"德国", FR:"法国", NL:"荷兰", RU:"俄罗斯",
+    AU:"澳大利亚", NZ:"新西兰", IN:"印度", MY:"马来西亚", TH:"泰国", VN:"越南",
+    ID:"印度尼西亚", PH:"菲律宾", AE:"阿联酋", TR:"土耳其", BR:"巴西", AR:"阿根廷",
+    MX:"墨西哥", IT:"意大利", ES:"西班牙", SE:"瑞典", CH:"瑞士", NO:"挪威",
+    FI:"芬兰", DK:"丹麦", PL:"波兰", UA:"乌克兰", IE:"爱尔兰", AT:"奥地利",
+    BE:"比利时", CZ:"捷克", RO:"罗马尼亚", ZA:"南非", IL:"以色列", PT:"葡萄牙",
+    GR:"希腊", HU:"匈牙利", BG:"保加利亚", RS:"塞尔维亚", SK:"斯洛伐克",
+    SI:"斯洛文尼亚", HR:"克罗地亚", LT:"立陶宛", LV:"拉脱维亚", EE:"爱沙尼亚",
+    IS:"冰岛", LU:"卢森堡", MT:"马耳他", CY:"塞浦路斯", GE:"格鲁吉亚",
+    AM:"亚美尼亚", AZ:"阿塞拜疆", KZ:"哈萨克斯坦", UZ:"乌兹别克斯坦",
+    PK:"巴基斯坦", BD:"孟加拉国", LK:"斯里兰卡", NP:"尼泊尔", MM:"缅甸",
+    KH:"柬埔寨", LA:"老挝", MN:"蒙古", SA:"沙特阿拉伯", QA:"卡塔尔",
+    KW:"科威特", OM:"阿曼", BH:"巴林", JO:"约旦", LB:"黎巴嫩", EG:"埃及",
+    MA:"摩洛哥", DZ:"阿尔及利亚", TN:"突尼斯", KE:"肯尼亚", NG:"尼日利亚",
+    GH:"加纳", ET:"埃塞俄比亚", CL:"智利", PE:"秘鲁", CO:"哥伦比亚",
+    VE:"委内瑞拉", UY:"乌拉圭", PY:"巴拉圭", BO:"玻利维亚", EC:"厄瓜多尔",
+    CR:"哥斯达黎加", PA:"巴拿马", DO:"多米尼加共和国", GT:"危地马拉",
+    CU:"古巴", JM:"牙买加", PR:"波多黎各"
 };
 
 const regionZh = {
-    "Tokyo":"东京", "Osaka":"大阪", "Kyoto":"京都", "Aichi":"爱知", "Kanagawa":"神奈川", "Saitama":"埼玉", "Chiba":"千叶",
-    "Hokkaido":"北海道", "Fukuoka":"福冈", "Hyogo":"兵库", "Nagano":"长野", "Shizuoka":"静冈", "Okinawa":"冲绳",
-    "Guangdong":"广东", "Jiangsu":"江苏", "Zhejiang":"浙江", "Fujian":"福建", "Sichuan":"四川", "Hubei":"湖北",
-    "Hunan":"湖南", "Shandong":"山东", "Henan":"河南", "Hebei":"河北", "Anhui":"安徽", "Jiangxi":"江西",
-    "Liaoning":"辽宁", "Jilin":"吉林", "Heilongjiang":"黑龙江", "Yunnan":"云南", "Guangxi":"广西", "Guizhou":"贵州",
-    "Shaanxi":"陕西", "Shanxi":"山西", "Gansu":"甘肃", "Qinghai":"青海", "Xinjiang":"新疆", "Tibet":"西藏",
-    "Beijing":"北京", "Shanghai":"上海", "Tianjin":"天津", "Chongqing":"重庆", "New York":"纽约", "California":"加利福尼亚",
-    "Texas":"得克萨斯", "Virginia":"弗吉尼亚", "Washington":"华盛顿", "Florida":"佛罗里达", "Illinois":"伊利诺伊",
-    "Ontario":"安大略", "Quebec":"魁北克", "British Columbia":"不列颠哥伦比亚"
+    Tokyo:"东京", Osaka:"大阪", Kyoto:"京都", Hokkaido:"北海道", Aichi:"爱知",
+    Kanagawa:"神奈川", Saitama:"埼玉", Chiba:"千叶", Fukuoka:"福冈", Hyogo:"兵库",
+    Guangdong:"广东", Jiangsu:"江苏", Zhejiang:"浙江", Beijing:"北京", Shanghai:"上海",
+    Shandong:"山东", Fujian:"福建", Sichuan:"四川", Hubei:"湖北", Hunan:"湖南",
+    Anhui:"安徽", Jiangxi:"江西", Henan:"河南", Hebei:"河北", Shanxi:"山西",
+    Liaoning:"辽宁", Jilin:"吉林", Heilongjiang:"黑龙江", Shaanxi:"陕西",
+    Gansu:"甘肃", Qinghai:"青海", Yunnan:"云南", Guizhou:"贵州", Guangxi:"广西",
+    "Inner Mongolia":"内蒙古", Xinjiang:"新疆", Tibet:"西藏", Ningxia:"宁夏",
+    "Hong Kong":"香港", Macau:"澳门", Taiwan:"台湾",
+    California:"加利福尼亚州", "New York":"纽约州", Texas:"得克萨斯州",
+    Washington:"华盛顿州", Florida:"佛罗里达州", Virginia:"弗吉尼亚州",
+    Illinois:"伊利诺伊州", "New Jersey":"新泽西州", Massachusetts:"马萨诸塞州",
+    Ontario:"安大略省", Quebec:"魁北克省", "British Columbia":"不列颠哥伦比亚省",
+    England:"英格兰", Scotland:"苏格兰", Wales:"威尔士", Bavaria:"巴伐利亚",
+    Hesse:"黑森", "Île-de-France":"法兰西岛大区", Seoul:"首尔", Busan:"釜山",
+    Gyeonggi:"京畿道", Singapore:"新加坡"
 };
 
 const cityZh = {
-    "Tokyo":"东京", "Osaka":"大阪", "Kyoto":"京都", "Nagoya":"名古屋", "Yokohama":"横滨", "Sapporo":"札幌", "Fukuoka":"福冈",
-    "Hong Kong":"香港", "Kowloon":"九龙", "Macau":"澳门", "Taipei":"台北", "Kaohsiung":"高雄", "Beijing":"北京",
-    "Shanghai":"上海", "Guangzhou":"广州", "Shenzhen":"深圳", "Hangzhou":"杭州", "Nanjing":"南京", "Chengdu":"成都",
-    "Wuhan":"武汉", "Chongqing":"重庆", "Xi'an":"西安", "Xian":"西安", "Tianjin":"天津", "Singapore":"新加坡",
-    "Seoul":"首尔", "Busan":"釜山", "New York":"纽约", "Los Angeles":"洛杉矶", "San Francisco":"旧金山", "Seattle":"西雅图",
-    "Chicago":"芝加哥", "Dallas":"达拉斯", "Miami":"迈阿密", "London":"伦敦", "Frankfurt":"法兰克福", "Paris":"巴黎",
-    "Amsterdam":"阿姆斯特丹", "Moscow":"莫斯科", "Sydney":"悉尼", "Melbourne":"墨尔本", "Toronto":"多伦多", "Vancouver":"温哥华"
+    Tokyo:"东京", Osaka:"大阪", Kyoto:"京都", Nagoya:"名古屋", Yokohama:"横滨",
+    Sapporo:"札幌", Fukuoka:"福冈", Kobe:"神户", "Hong Kong":"香港", Macau:"澳门",
+    Taipei:"台北", Kaohsiung:"高雄", Beijing:"北京", Shanghai:"上海",
+    Guangzhou:"广州", Shenzhen:"深圳", Nanjing:"南京", "Nanjing City":"南京",
+    Suzhou:"苏州", Wuxi:"无锡", Hangzhou:"杭州", Ningbo:"宁波", Wenzhou:"温州",
+    Hefei:"合肥", Jinan:"济南", Qingdao:"青岛", Zhengzhou:"郑州", Wuhan:"武汉",
+    Changsha:"长沙", Nanchang:"南昌", Fuzhou:"福州", Xiamen:"厦门", Chengdu:"成都",
+    Chongqing:"重庆", "Xi'an":"西安", Xian:"西安", Shenyang:"沈阳", Dalian:"大连",
+    Harbin:"哈尔滨", Changchun:"长春", Kunming:"昆明", Guiyang:"贵阳",
+    Nanning:"南宁", Urumqi:"乌鲁木齐", Lanzhou:"兰州", Xining:"西宁",
+    Yinchuan:"银川", Hohhot:"呼和浩特", "Los Angeles":"洛杉矶",
+    "San Francisco":"旧金山", "New York":"纽约", Chicago:"芝加哥", Seattle:"西雅图",
+    Houston:"休斯顿", Dallas:"达拉斯", Miami:"迈阿密", Boston:"波士顿",
+    Washington:"华盛顿", Vancouver:"温哥华", Toronto:"多伦多", Montreal:"蒙特利尔",
+    London:"伦敦", Manchester:"曼彻斯特", Paris:"巴黎", Frankfurt:"法兰克福",
+    Berlin:"柏林", Amsterdam:"阿姆斯特丹", Moscow:"莫斯科", Sydney:"悉尼",
+    Melbourne:"墨尔本", Singapore:"新加坡", Seoul:"首尔", Busan:"釜山",
+    Bangkok:"曼谷", "Kuala Lumpur":"吉隆坡", Jakarta:"雅加达", Manila:"马尼拉",
+    Dubai:"迪拜", Istanbul:"伊斯坦布尔", Madrid:"马德里", Barcelona:"巴塞罗那",
+    Rome:"罗马", Milan:"米兰", Zurich:"苏黎世", Vienna:"维也纳",
+    Prague:"布拉格", Warsaw:"华沙", Stockholm:"斯德哥尔摩", Oslo:"奥斯陆",
+    Helsinki:"赫尔辛基", Copenhagen:"哥本哈根", Dublin:"都柏林", Lisbon:"里斯本",
+    Athens:"雅典"
 };
 
 function toZhLocation(value, map) {
     if (!value) return "";
-    return map[value] || value;
+    const key = String(value).trim();
+    return map[key] || key;
 }
 
 function countryToZh(data) {
-    if (data.country_code && countryZh[data.country_code.toUpperCase()]) return countryZh[data.country_code.toUpperCase()];
-    if (data.country && countryZh[data.country]) return countryZh[data.country];
+    const code = String(data.country_code || "").toUpperCase();
+    if (code && countryZh[code]) return countryZh[code];
+
     try {
-        if (data.country_code && typeof Intl !== "undefined" && Intl.DisplayNames) {
-            const dn = new Intl.DisplayNames(["zh-CN"], { type: "region" });
-            return dn.of(data.country_code.toUpperCase()) || data.country || "";
+        if (code && typeof Intl !== "undefined" && Intl.DisplayNames) {
+            const name = new Intl.DisplayNames(["zh-CN"], { type: "region" }).of(code);
+            if (name) return name;
         }
-    } catch(e) {}
+    } catch (e) {}
+
     return data.country || "";
 }
 
 async function getIPLocation(ip){
     if(ipLocationCache[ip]) return ipLocationCache[ip];
-
     try{
         const res = await fetch("https://api.ip.sb/geoip/" + encodeURIComponent(ip));
         const data = await res.json();
-
         if(data){
             const parts = [];
-            const country = countryToZh(data);
-            if(country) parts.push(country);
+            const country = countryToZh(data); if(country) parts.push(country);
             const region = toZhLocation(data.region, regionZh);
             const city = toZhLocation(data.city, cityZh);
             if(region && region !== country && region !== city) parts.push(region);
@@ -675,7 +655,6 @@ async function getIPLocation(ip){
             return ipLocationCache[ip];
         }
     }catch(e){}
-
     ipLocationCache[ip] = "未知";
     return "未知";
 }
@@ -684,7 +663,10 @@ function refreshIPLocations(nodes){
     nodes.forEach(n=>{
         getIPLocation(n.ip).then(loc=>{
             const el=document.getElementById("location-"+n.ip);
-            if(el) el.innerText=loc;
+            if(el) {
+                el.innerText = loc;
+                el.title = loc; // 鼠标悬停显示完整地址
+            }
         });
     });
 }
@@ -697,11 +679,11 @@ async function refreshDashboard(isInitial = false) {
     if (sysData) {
         const badge = $("service-status-badge"), uptimeEl = $("service-uptime"), dot = $("header-dot");
         if (sysData.running) {
-            badge.className = "badge-online"; badge.innerText = "运行中";
+            badge.className = "badge-status-pill badge-online"; badge.innerHTML = '<i class="dot"></i>运行中';
             uptimeEl.style.color = "var(--text-main)"; uptimeEl.innerText = formatUptime(sysData.uptime);
             if (dot) dot.style.backgroundColor = "var(--ios-green)";
         } else {
-            badge.className = "badge-offline"; badge.innerText = "已停止";
+            badge.className = "badge-status-pill badge-offline"; badge.innerHTML = '<i class="dot"></i>已停止';
             uptimeEl.innerText = "已停止"; uptimeEl.style.color = "var(--text-muted)";
             if (dot) dot.style.backgroundColor = "var(--ios-red)";
         }
@@ -718,7 +700,7 @@ async function refreshDashboard(isInitial = false) {
 
         let totalOnline = 0, totalOffline = 0, totalDelay = 0, delayCount = 0;
         const nodes = config.nodes || [];
-         refreshIPLocations(nodes);
+        refreshIPLocations(nodes);
         
         const htmlParts = nodes.map(n => {
             const item = !isRunning ? { name: n.name, ip: n.ip, status: "等待检测", delay: "-", last: "-", fail: 0 }
@@ -735,28 +717,32 @@ async function refreshDashboard(isInitial = false) {
 
             return `
             <div class="node-card" data-ip="${escapeHtml(item.ip)}">
-              <button class="node-sort-handle" type="button" aria-label="拖动排序" title="拖动排序">
+              <button class="node-sort-handle" type="button" aria-label="拖动排序">
                 <span></span><span></span><span></span>
               </button>
               <div class="node-top-row">
                 <div class="node-identity">
                   <span class="node-name" title="${escapeHtml(item.name || '未命名')}">${escapeHtml(item.name || '未命名')}</span>
-                  <span class="node-ip" onclick="copyText('${escapeHtml(item.ip)}')">${escapeHtml(item.ip)}</span>
-                   <span class="node-location" id="location-${escapeHtml(item.ip)}">查询归属地...</span>
+                  <div class="node-sub-info">
+                    <span class="node-ip" onclick="copyText('${escapeHtml(item.ip)}')">${escapeHtml(item.ip)}</span>
+                    <span class="node-location" id="location-${escapeHtml(item.ip)}" onclick="toggleLocation(this)">查询归属地...</span>
+                  </div>
                 </div>
-                <div style="display:flex; align-items:center; gap:12px;">
-                  <span class="${badgeCls}">${escapeHtml(item.status)}</span>
+                <div class="node-status-wrapper">
+                  <span class="badge-status-pill ${badgeCls}">
+                    <i class="dot"></i>${escapeHtml(item.status)}
+                  </span>
                   <span class="delay-text ${delayCls}">${escapeHtml(String(item.delay))}</span>
                 </div>
               </div>
               <div class="node-bottom-row">
                 <div class="node-stats-group">
                   <span>最后检测: <strong class="stat-val">${escapeHtml(String(item.last))}</strong></span>
-                  ${failCount > 0 ? `<span style="color:var(--ios-red);">连续失败: <strong style="color:var(--ios-red);">${failCount} 次</strong></span>` : ''}
+                  ${failCount > 0 ? `<span class="fail-tag">连续失败: ${failCount}次</span>` : ''}
                 </div>
                 <div class="node-action-group">
-                  <button class="ios-btn ios-btn-secondary" style="height:30px; padding:0 14px; font-size:12px; font-weight:600; width:auto;" onclick="openEditModal('${escapeHtml(item.ip)}')">编辑</button>
-                  <button class="del-btn" onclick="delNode('${escapeHtml(item.ip)}')">删除</button>
+                  <button class="action-btn-sm edit-btn" onclick="openEditModal('${escapeHtml(item.ip)}')">编辑</button>
+                  <button class="action-btn-sm del-btn" onclick="delNode('${escapeHtml(item.ip)}')">删除</button>
                 </div>
               </div>
             </div>`;
@@ -772,17 +758,15 @@ async function refreshDashboard(isInitial = false) {
         if (nodes.length === 0) {
             container.innerHTML = '<div class="ios-card" style="padding: 24px; text-align: center; color: var(--text-muted); font-size: 14px;"><span class="empty-pc">暂无监控节点，请在右侧添加</span><span class="empty-mobile">暂无监控节点，点击标题打开控制台添加</span></div>';
             lastRenderedHTML = "";
-        } else if (!sortMode) {
-            const finalHTML = '<div class="node-cards-grid">' + htmlParts.join('') + '</div>';
+        } else {
+            const finalHTML = '<div class="node-cards-grid' + (sortMode ? ' sorting' : '') + '">' + htmlParts.join('') + '</div>';
             if (finalHTML !== lastRenderedHTML) {
                 container.innerHTML = finalHTML;
                 lastRenderedHTML = finalHTML;
-            }
-        } else {
-            const grid = container.querySelector(".node-cards-grid");
-            if (grid) {
-                grid.classList.add("sorting");
-                bindSortEvents(grid);
+                const grid = container.querySelector(".node-cards-grid");
+                if (grid && sortMode) {
+                    bindSortEvents(grid);
+                }
             }
         }
     }
@@ -828,17 +812,13 @@ async function addNode(){
     const name = $("name").value.trim(), ip = $("ip").value.trim();
     if (!ip) { showToast("请输入有效的 IP 地址或域名"); return; }
     
-    // 添加节点
     const result = await apiPost("/api/add", { name, ip }, "节点添加成功");
     if (result) {
         $("name").value = ""; $("ip").value = "";
-        
-        // 检查服务是否正在运行，如果是，则立即触发一次检查/刷新以让新节点开始检测
         try {
             const sysRes = await fetch("/api/system");
             const sysData = await sysRes.json().catch(() => ({}));
             if (sysData && sysData.running) {
-                // 如果后端有触发检测的接口可在此调用，或者直接强行刷新面板
                 await refreshDashboard();
             }
         } catch(e) {}
@@ -899,7 +879,6 @@ function escapeHtml(str) {
     return String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
 }
 
-
 let sortMode = false;
 let editingOriginalIP = "";
 let sortDragCard = null;
@@ -910,23 +889,13 @@ let sortMoved = false;
 function toggleSortMode() {
     sortMode = !sortMode;
     const btn = $("sort-toggle-btn");
-    const hint = $("sort-hint");
     btn.classList.toggle("active", sortMode);
     btn.innerText = sortMode ? "完成" : "排序";
-    if (hint) hint.classList.toggle("show", sortMode);
-
     const grid = document.querySelector(".node-cards-grid");
     if (grid) {
         grid.classList.toggle("sorting", sortMode);
         bindSortEvents(grid);
-    }
-
-    if (sortMode) {
-        showToast("已进入排序模式");
-    } else {
-        clearSortDrag();
-        showToast("排序模式已结束");
-        refreshDashboard();
+        if (!sortMode) clearSortDrag();
     }
 }
 
@@ -941,104 +910,45 @@ function bindSortEvents(grid) {
     if (grid.dataset.sortBound === "1") return;
     grid.dataset.sortBound = "1";
 
-    let autoScrollTimer = null;
-
-    const stopAutoScroll = () => {
-        if (autoScrollTimer) {
-            cancelAnimationFrame(autoScrollTimer);
-            autoScrollTimer = null;
-        }
-    };
-
-    const autoScroll = (clientY) => {
-        const edge = 70;
-        const speed = 9;
-        let delta = 0;
-        if (clientY < edge) delta = -speed;
-        else if (clientY > window.innerHeight - edge) delta = speed;
-        if (!delta) {
-            stopAutoScroll();
-            return;
-        }
-        if (autoScrollTimer) return;
-        const tick = () => {
-            if (!sortDragCard) {
-                stopAutoScroll();
-                return;
-            }
-            window.scrollBy(0, delta);
-            autoScrollTimer = requestAnimationFrame(tick);
-        };
-        autoScrollTimer = requestAnimationFrame(tick);
-    };
-
     grid.addEventListener("pointerdown", e => {
         if (!sortMode) return;
         const handle = e.target.closest(".node-sort-handle");
         if (!handle) return;
-
         const card = handle.closest(".node-card");
         if (!card) return;
-
         e.preventDefault();
         sortDragCard = card;
         sortPointerId = e.pointerId;
         sortStartY = e.clientY;
         sortMoved = false;
-        handle.classList.add("grabbing");
-
-        if (navigator.vibrate) {
-            try { navigator.vibrate(12); } catch(err) {}
-        }
         try { handle.setPointerCapture(e.pointerId); } catch(err) {}
     });
 
     grid.addEventListener("pointermove", e => {
         if (!sortMode || !sortDragCard || e.pointerId !== sortPointerId) return;
-
         const distance = Math.abs(e.clientY - sortStartY);
         if (!sortMoved && distance < 5) return;
-
         if (!sortMoved) {
             sortMoved = true;
             sortDragCard.classList.add("dragging");
         }
-
         e.preventDefault();
-        autoScroll(e.clientY);
-
         const el = document.elementFromPoint(e.clientX, e.clientY);
         const target = el && el.closest ? el.closest(".node-card") : null;
         if (!target || target === sortDragCard || target.parentNode !== grid) return;
-
         const rect = target.getBoundingClientRect();
         const before = e.clientY < rect.top + rect.height / 2;
-        if (before) {
-            grid.insertBefore(sortDragCard, target);
-        } else if (target.nextSibling !== sortDragCard) {
-            grid.insertBefore(sortDragCard, target.nextSibling);
-        }
+        if (before) grid.insertBefore(sortDragCard, target);
+        else grid.insertBefore(sortDragCard, target.nextSibling);
     });
 
     const finish = async e => {
         if (!sortDragCard || e.pointerId !== sortPointerId) return;
-
-        stopAutoScroll();
         const didMove = sortMoved;
         const gridRef = grid;
-        const handle = sortDragCard.querySelector(".node-sort-handle");
-        if (handle) handle.classList.remove("grabbing");
-
         clearSortDrag();
-
-        if (didMove) {
-            if (navigator.vibrate) {
-                try { navigator.vibrate(18); } catch(err) {}
-            }
-            await saveCurrentOrder(gridRef);
-        }
+        if (didMove) await saveCurrentOrder(gridRef);
     };
-
     grid.addEventListener("pointerup", finish);
     grid.addEventListener("pointercancel", finish);
 }
@@ -1057,10 +967,7 @@ async function saveCurrentOrder(grid) {
 async function openEditModal(ip) {
     const config = await fetchJSON("/api/config");
     const node = config && (config.nodes || []).find(n => n.ip === ip);
-    if (!node) {
-        showToast("未找到该节点");
-        return;
-    }
+    if (!node) { showToast("未找到该节点"); return; }
     editingOriginalIP = ip;
     $("edit-name").value = node.name || "";
     $("edit-ip").value = node.ip || "";
@@ -1076,22 +983,10 @@ function closeEditModal() {
 async function saveEditNode() {
     const name = $("edit-name").value.trim();
     const ip = $("edit-ip").value.trim();
+    if (!ip) { showToast("请输入有效的 IP 地址或域名"); return; }
+    if (!editingOriginalIP) { closeEditModal(); return; }
 
-    if (!ip) {
-        showToast("请输入有效的 IP 地址或域名");
-        return;
-    }
-    if (!editingOriginalIP) {
-        closeEditModal();
-        return;
-    }
-
-    const result = await apiPost("/api/edit", {
-        old_ip: editingOriginalIP,
-        name,
-        ip
-    }, "节点信息已更新");
-
+    const result = await apiPost("/api/edit", { old_ip: editingOriginalIP, name, ip }, "节点信息已更新");
     if (result) {
         delete ipLocationCache[editingOriginalIP];
         delete ipLocationCache[ip];
@@ -1119,22 +1014,16 @@ function toggleDrawer(expand, fromPopState = false) {
     if (isExpanded) {
         drawer.classList.add("open"); drawer.classList.remove("closed"); overlay.classList.add("open");
         document.body.classList.add("drawer-open");
-        if (!fromPopState) {
-            try { history.pushState({ drawerOpen: true }, ""); } catch(e) {}
-        }
+        if (!fromPopState) { try { history.pushState({ drawerOpen: true }, ""); } catch(e) {} }
     } else {
         drawer.classList.add("closed"); drawer.classList.remove("open"); overlay.classList.remove("open");
         document.body.classList.remove("drawer-open");
-        if (!fromPopState && history.state && history.state.drawerOpen) {
-            try { history.back(); } catch(e) {}
-        }
+        if (!fromPopState && history.state && history.state.drawerOpen) { try { history.back(); } catch(e) {} }
     }
 }
 
-window.addEventListener("popstate", (e) => {
-    if (isMobile() && isExpanded) {
-        toggleDrawer(false, true);
-    }
+window.addEventListener("popstate", () => {
+    if (isMobile() && isExpanded) toggleDrawer(false, true);
 });
 
 function onTouchStart(e, fromContent = false) {
@@ -1201,8 +1090,11 @@ refreshDashboard(true);
 let pollTimer = setInterval(refreshDashboard, 5000);
 
 document.addEventListener("visibilitychange", () => {
-    if (document.hidden) { clearInterval(pollTimer); pollTimer = null; }
-    else { refreshDashboard(); if (!pollTimer) pollTimer = setInterval(refreshDashboard, 5000); }
+    if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+    if (!document.hidden) {
+        refreshDashboard();
+        pollTimer = setInterval(refreshDashboard, 5000);
+    }
 });
 </script>
 </body>
