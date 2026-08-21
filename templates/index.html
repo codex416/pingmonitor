@@ -253,29 +253,155 @@
     .controls-sidebar .group-title:first-child { margin-top: 0; }
     .terminal-card { height: 260px; }
   }
-  .node-list-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-  .node-list-header .group-title { margin-right: 0; }
-  .node-sort-btn { height: 32px; padding: 0 12px; border: none; border-radius: 8px; background: #e5e5ea; color: var(--ios-blue); font-size: 12px; font-weight: 600; cursor: pointer; flex-shrink: 0; }
-  .node-sort-btn.active { background: var(--ios-blue); color: #fff; }
-  .node-card { position: relative; }
-  .node-sort-handle { display: none; position: absolute; left: 6px; top: 50%; transform: translateY(-50%); width: 34px; height: 38px; margin: 0; padding: 0; border: none; border-radius: 8px; background: transparent; color: var(--text-muted); align-items: center; justify-content: center; flex-direction: column; gap: 4px; cursor: grab; flex-shrink: 0; touch-action: none; user-select: none; -webkit-user-select: none; }
-  .node-sort-handle span { display: block; width: 18px; height: 2px; border-radius: 2px; background: currentColor; }
-  .node-cards-grid.sorting .node-sort-handle { display: flex; }
-  .node-cards-grid.sorting .node-card { cursor: default; padding-left: 62px; }
-  .node-cards-grid.sorting .node-top-row { min-width: 0; }
-  .node-sort-handle:active { cursor: grabbing; }
-  .node-card.dragging { opacity: 0.55; transform: scale(0.985); box-shadow: 0 8px 24px rgba(0,0,0,0.12); }
-  .node-card.sort-placeholder { opacity: 0.35; }
-  @media (min-width: 992px) {
-    .node-cards-grid.sorting .node-card { padding-left: 62px; }
+  .node-list-header {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    min-height: 36px;
   }
+  .node-list-header .group-title { margin-right: 0; }
+
+  .node-sort-btn {
+    height: 32px;
+    min-width: 58px;
+    padding: 0 13px;
+    border: 0.5px solid rgba(0,122,255,0.18);
+    border-radius: 9px;
+    background: rgba(0,122,255,0.08);
+    color: var(--ios-blue);
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    flex: 0 0 auto;
+    transition: background .2s ease, color .2s ease, border-color .2s ease, transform .15s ease;
+  }
+  .node-sort-btn:hover { background: rgba(0,122,255,0.13); }
+  .node-sort-btn:active { transform: scale(.96); }
+  .node-sort-btn.active {
+    background: var(--ios-blue);
+    border-color: var(--ios-blue);
+    color: #fff;
+  }
+
+  .sort-hint {
+    display: none;
+    align-items: center;
+    gap: 7px;
+    margin: -2px 2px 10px;
+    font-size: 11px;
+    color: var(--text-muted);
+    animation: sortHintIn .22s ease both;
+  }
+  .sort-hint.show { display: flex; }
+  .sort-hint-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--ios-blue);
+    box-shadow: 0 0 0 4px rgba(0,122,255,.08);
+    flex: 0 0 auto;
+  }
+  @keyframes sortHintIn {
+    from { opacity: 0; transform: translateY(-3px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .node-card { position: relative; }
+
+  /* 三横手柄：精致、紧凑，不占用卡片布局空间 */
+  .node-sort-handle {
+    display: none;
+    position: absolute;
+    left: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 34px;
+    height: 42px;
+    padding: 0;
+    border: 0.5px solid rgba(60,60,67,0.10);
+    border-radius: 10px;
+    background: rgba(242,242,247,0.94);
+    color: #8e8e93;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 4px;
+    cursor: grab;
+    touch-action: none;
+    user-select: none;
+    -webkit-user-select: none;
+    box-shadow: 0 1px 4px rgba(0,0,0,.04);
+    z-index: 5;
+    transition: background .18s ease, color .18s ease, box-shadow .18s ease, transform .18s ease;
+  }
+  .node-sort-handle span {
+    display: block;
+    width: 15px;
+    height: 2px;
+    border-radius: 3px;
+    background: currentColor;
+  }
+  .node-sort-handle:hover {
+    color: var(--ios-blue);
+    background: rgba(0,122,255,.08);
+    box-shadow: 0 3px 10px rgba(0,122,255,.10);
+  }
+  .node-sort-handle.grabbing,
+  .node-sort-handle:active {
+    cursor: grabbing;
+    color: var(--ios-blue);
+    background: rgba(0,122,255,.12);
+    transform: translateY(-50%) scale(1.04);
+  }
+
+  /* 排序模式视觉反馈：卡片不改变尺寸、不增加 padding */
+  .node-cards-grid.sorting .node-sort-handle { display: flex; }
+  .node-cards-grid.sorting .node-card {
+    outline: 1px solid rgba(0,122,255,.08);
+    box-shadow: 0 3px 12px rgba(0,0,0,.045);
+  }
+  .node-cards-grid.sorting .node-card::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border: 1px dashed rgba(0,122,255,.12);
+    border-radius: var(--card-radius);
+    pointer-events: none;
+  }
+  .node-card.dragging {
+    opacity: .96;
+    transform: scale(1.018);
+    box-shadow: 0 14px 32px rgba(0,0,0,.16);
+    outline: 1.5px solid rgba(0,122,255,.30) !important;
+    z-index: 20;
+    transition: none !important;
+  }
+  .node-card.dragging .node-sort-handle {
+    color: var(--ios-blue);
+    background: rgba(0,122,255,.12);
+    box-shadow: 0 4px 12px rgba(0,122,255,.12);
+  }
+
   @media (max-width: 991px) {
     .node-list-header { gap: 8px; }
-    .node-sort-btn { height: 34px; min-width: 64px; padding: 0 14px; border-radius: 9px; }
-    .node-cards-grid.sorting .node-sort-handle { display: flex; }
-    .node-sort-handle { width: 38px; height: 42px; margin-left: -10px; }
-    .node-sort-handle span { width: 20px; height: 2px; }
+    .node-sort-btn {
+      height: 34px;
+      min-width: 62px;
+      padding: 0 14px;
+      border-radius: 10px;
+    }
+    .sort-hint { margin-bottom: 9px; font-size: 11px; }
+    .node-sort-handle {
+      left: 8px;
+      width: 36px;
+      height: 44px;
+      border-radius: 11px;
+    }
+    .node-sort-handle span { width: 16px; }
   }
+
   .edit-modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.38); backdrop-filter: blur(5px); -webkit-backdrop-filter: blur(5px); display: none; align-items: center; justify-content: center; padding: 20px; z-index: 2100; }
   .edit-modal-overlay.open { display: flex; }
   .edit-modal { width: min(420px, 100%); background: var(--card-bg); border-radius: 16px; box-shadow: 0 18px 55px rgba(0,0,0,0.22); padding: 20px; }
@@ -325,6 +451,10 @@
       <div class="node-list-header">
         <div class="group-title" style="margin-bottom:12px;">监控节点列表</div>
         <button class="node-sort-btn" id="sort-toggle-btn" type="button" onclick="toggleSortMode()">排序</button>
+      </div>
+      <div class="sort-hint" id="sort-hint">
+        <span class="sort-hint-dot"></span>
+        <span>拖动卡片左侧手柄调整顺序</span>
       </div>
       <div id="nodes-container">
         <div class="ios-card" style="padding: 24px; text-align: center; color: var(--text-muted); font-size: 14px;">正在加载节点...</div>
@@ -642,16 +772,17 @@ async function refreshDashboard(isInitial = false) {
         if (nodes.length === 0) {
             container.innerHTML = '<div class="ios-card" style="padding: 24px; text-align: center; color: var(--text-muted); font-size: 14px;"><span class="empty-pc">暂无监控节点，请在右侧添加</span><span class="empty-mobile">暂无监控节点，点击标题打开控制台添加</span></div>';
             lastRenderedHTML = "";
-        } else {
+        } else if (!sortMode) {
             const finalHTML = '<div class="node-cards-grid">' + htmlParts.join('') + '</div>';
             if (finalHTML !== lastRenderedHTML) {
                 container.innerHTML = finalHTML;
                 lastRenderedHTML = finalHTML;
-                const grid = container.querySelector(".node-cards-grid");
-                if (grid && sortMode) {
-                    grid.classList.add("sorting");
-                    bindSortEvents(grid);
-                }
+            }
+        } else {
+            const grid = container.querySelector(".node-cards-grid");
+            if (grid) {
+                grid.classList.add("sorting");
+                bindSortEvents(grid);
             }
         }
     }
@@ -779,15 +910,23 @@ let sortMoved = false;
 function toggleSortMode() {
     sortMode = !sortMode;
     const btn = $("sort-toggle-btn");
+    const hint = $("sort-hint");
     btn.classList.toggle("active", sortMode);
     btn.innerText = sortMode ? "完成" : "排序";
+    if (hint) hint.classList.toggle("show", sortMode);
+
     const grid = document.querySelector(".node-cards-grid");
     if (grid) {
         grid.classList.toggle("sorting", sortMode);
         bindSortEvents(grid);
-        if (!sortMode) {
-            clearSortDrag();
-        }
+    }
+
+    if (sortMode) {
+        showToast("已进入排序模式");
+    } else {
+        clearSortDrag();
+        showToast("排序模式已结束");
+        refreshDashboard();
     }
 }
 
@@ -802,45 +941,104 @@ function bindSortEvents(grid) {
     if (grid.dataset.sortBound === "1") return;
     grid.dataset.sortBound = "1";
 
+    let autoScrollTimer = null;
+
+    const stopAutoScroll = () => {
+        if (autoScrollTimer) {
+            cancelAnimationFrame(autoScrollTimer);
+            autoScrollTimer = null;
+        }
+    };
+
+    const autoScroll = (clientY) => {
+        const edge = 70;
+        const speed = 9;
+        let delta = 0;
+        if (clientY < edge) delta = -speed;
+        else if (clientY > window.innerHeight - edge) delta = speed;
+        if (!delta) {
+            stopAutoScroll();
+            return;
+        }
+        if (autoScrollTimer) return;
+        const tick = () => {
+            if (!sortDragCard) {
+                stopAutoScroll();
+                return;
+            }
+            window.scrollBy(0, delta);
+            autoScrollTimer = requestAnimationFrame(tick);
+        };
+        autoScrollTimer = requestAnimationFrame(tick);
+    };
+
     grid.addEventListener("pointerdown", e => {
         if (!sortMode) return;
         const handle = e.target.closest(".node-sort-handle");
         if (!handle) return;
+
         const card = handle.closest(".node-card");
         if (!card) return;
+
         e.preventDefault();
         sortDragCard = card;
         sortPointerId = e.pointerId;
         sortStartY = e.clientY;
         sortMoved = false;
+        handle.classList.add("grabbing");
+
+        if (navigator.vibrate) {
+            try { navigator.vibrate(12); } catch(err) {}
+        }
         try { handle.setPointerCapture(e.pointerId); } catch(err) {}
     });
 
     grid.addEventListener("pointermove", e => {
         if (!sortMode || !sortDragCard || e.pointerId !== sortPointerId) return;
+
         const distance = Math.abs(e.clientY - sortStartY);
         if (!sortMoved && distance < 5) return;
+
         if (!sortMoved) {
             sortMoved = true;
             sortDragCard.classList.add("dragging");
         }
+
         e.preventDefault();
+        autoScroll(e.clientY);
+
         const el = document.elementFromPoint(e.clientX, e.clientY);
         const target = el && el.closest ? el.closest(".node-card") : null;
         if (!target || target === sortDragCard || target.parentNode !== grid) return;
+
         const rect = target.getBoundingClientRect();
         const before = e.clientY < rect.top + rect.height / 2;
-        if (before) grid.insertBefore(sortDragCard, target);
-        else grid.insertBefore(sortDragCard, target.nextSibling);
+        if (before) {
+            grid.insertBefore(sortDragCard, target);
+        } else if (target.nextSibling !== sortDragCard) {
+            grid.insertBefore(sortDragCard, target.nextSibling);
+        }
     });
 
     const finish = async e => {
         if (!sortDragCard || e.pointerId !== sortPointerId) return;
+
+        stopAutoScroll();
         const didMove = sortMoved;
         const gridRef = grid;
+        const handle = sortDragCard.querySelector(".node-sort-handle");
+        if (handle) handle.classList.remove("grabbing");
+
         clearSortDrag();
-        if (didMove) await saveCurrentOrder(gridRef);
+
+        if (didMove) {
+            if (navigator.vibrate) {
+                try { navigator.vibrate(18); } catch(err) {}
+            }
+            await saveCurrentOrder(gridRef);
+        }
     };
+
     grid.addEventListener("pointerup", finish);
     grid.addEventListener("pointercancel", finish);
 }
