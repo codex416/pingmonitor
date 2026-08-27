@@ -369,6 +369,45 @@
     opacity: 0; transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1); z-index: 2000; pointer-events: none;
   }
   #toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
+
+/* ===== PC 鼠标滚轮滚动修复 ===== */
+@media (min-width: 992px) {
+    html, body {
+        overflow-y: auto !important;
+        overflow-x: hidden;
+    }
+
+    body {
+        overscroll-behavior-y: auto;
+    }
+
+    #main,
+    .main,
+    .main-content,
+    .content,
+    .page-content {
+        overflow-y: visible !important;
+    }
+
+    #drawer-content,
+    .drawer-content {
+        overscroll-behavior: contain;
+    }
+}
+
+
+/* 控制面板关闭时，遮罩层绝不拦截鼠标事件 */
+#drawer-overlay:not(.open),
+.drawer-overlay:not(.open) {
+    pointer-events: none !important;
+}
+
+/* 打开时遮罩可点击，用于关闭面板 */
+#drawer-overlay.open,
+.drawer-overlay.open {
+    pointer-events: auto;
+}
+
 </style>
 <link rel="icon" type="image/webp" sizes="32x32" href="https://free.boltp.com/2026/08/06/6a744b5ca9f18.webp">
 <link rel="shortcut icon" href="https://free.boltp.com/2026/08/06/6a744b5ca9f18.webp">
@@ -507,7 +546,23 @@
 
 <script>
 let lastRenderedHTML = "", lastLogsText = "";
+let lastConfigSignature = "";
+let lastNodesSnapshot = [];
+let refreshInFlight = false;
+let refreshSeq = 0;
+let locationQueue = [];
+let locationRunning = 0;
+const LOCATION_CONCURRENCY = 2;
+let locationGeneration = 0;
+const LOCATION_RETRY_MS = 30000;
+const locationRetryAt = {};
+let logLinesCache = [];
+const MAX_LOG_LINES = 800;
 const $ = id => document.getElementById(id);
+function cssEscape(value) {
+    if (window.CSS && typeof CSS.escape === "function") return CSS.escape(String(value));
+    return String(value).replace(/[^a-zA-Z0-9_-]/g, ch => "\\" + ch);
+}
 
 function toggleLocation(el) {
     el.classList.toggle("expanded");
@@ -544,8 +599,20 @@ function fallbackCopy(text) {
     document.body.removeChild(ta);
 }
 
-async function fetchJSON(url) {
-    try { const res = await fetch(url); return res.ok ? await res.json() : null; } catch { return null; }
+async function fetchJSON(url, options = {}) {
+    try {
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), options.timeout || 10000);
+        const res = await fetch(url, {
+            cache: "no-store",
+            signal: controller.signal,
+            headers: { "Accept": "application/json" }
+        });
+        clearTimeout(timer);
+        return res.ok ? await res.json() : null;
+    } catch {
+        return null;
+    }
 }
 
 const ipLocationCache = {};
@@ -637,153 +704,264 @@ function countryToZh(data) {
 }
 
 async function getIPLocation(ip){
-    if(ipLocationCache[ip]) return ipLocationCache[ip];
-    try{
-        const res = await fetch("https://api.ip.sb/geoip/" + encodeURIComponent(ip));
+    if (!ip) return "未知";
+    if (ipLocationCache[ip] && ipLocationCache[ip] !== "未知") return ipLocationCache[ip];
+    if (locationRetryAt[ip] && Date.now() < locationRetryAt[ip]) return "查询失败，稍后重试";
+
+    try {
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), 7000);
+        const res = await fetch("https://ipwho.is/" + encodeURIComponent(ip) + "?lang=zh-CN", {
+            cache: "no-store",
+            signal: controller.signal
+        });
+        clearTimeout(timer);
+        if (!res.ok) throw new Error("HTTP " + res.status);
         const data = await res.json();
-        if(data){
+
+        if (data && data.success !== false) {
             const parts = [];
-            const country = countryToZh(data); if(country) parts.push(country);
-            const region = toZhLocation(data.region, regionZh);
-            const city = toZhLocation(data.city, cityZh);
-            if(region && region !== country && region !== city) parts.push(region);
-            if(city && city !== country && city !== region) parts.push(city);
-            const isp = data.isp || data.organization || data.asn_organization;
+            const country = countryToZh(data); if (country) parts.push(country);
+            const region = data.region || "";
+            const city = data.city || "";
+            if (region && region !== country && region !== city) parts.push(toZhLocation(region, regionZh));
+            if (city && city !== country && city !== region) parts.push(toZhLocation(city, cityZh));
+
+            const isp = data.connection && (data.connection.isp || data.connection.org);
             let loc = parts.join(" ");
-            if(isp) loc += (loc ? " · " : "") + isp;
+            if (isp) loc += (loc ? " · " : "") + isp;
+
             ipLocationCache[ip] = loc || "未知";
+            delete locationRetryAt[ip];
             return ipLocationCache[ip];
         }
-    }catch(e){}
-    ipLocationCache[ip] = "未知";
+    } catch (e) {}
+
+    // 失败不永久缓存，避免一次网络波动导致一直显示“未知”
+    locationRetryAt[ip] = Date.now() + LOCATION_RETRY_MS;
     return "未知";
 }
 
-function refreshIPLocations(nodes){
-    nodes.forEach(n=>{
-        getIPLocation(n.ip).then(loc=>{
-            const el=document.getElementById("location-"+n.ip);
-            if(el) {
+function enqueueLocation(ip, generation) {
+    if (!ip || (ipLocationCache[ip] && ipLocationCache[ip] !== "未知")) return;
+    if (locationQueue.some(item => item.ip === ip)) return;
+    locationQueue.push({ ip, generation });
+    processLocationQueue();
+}
+
+async function processLocationQueue() {
+    while (locationRunning < LOCATION_CONCURRENCY && locationQueue.length) {
+        const job = locationQueue.shift();
+        locationRunning++;
+        getIPLocation(job.ip).then(loc => {
+            if (job.generation !== locationGeneration) return;
+            const el = document.querySelector('.node-location[data-ip="' + cssEscape(job.ip) + '"]');
+            if (el) {
                 el.innerText = loc;
-                el.title = loc; // 鼠标悬停显示完整地址
+                el.title = loc;
             }
+        }).finally(() => {
+            locationRunning--;
+            processLocationQueue();
         });
+    }
+}
+
+function refreshIPLocations(nodes){
+    const generation = locationGeneration;
+    nodes.forEach(n => {
+        const el = document.querySelector('.node-location[data-ip="' + cssEscape(n.ip) + '"]');
+        if (!el) return;
+        if (ipLocationCache[n.ip] && ipLocationCache[n.ip] !== "未知") {
+            el.innerText = ipLocationCache[n.ip];
+            el.title = ipLocationCache[n.ip];
+        } else {
+            el.innerText = "查询归属地...";
+            enqueueLocation(n.ip, generation);
+        }
     });
 }
 
+function nodeStatusData(node, statusMap, isRunning) {
+    if (!isRunning) return { name: node.name, ip: node.ip, status: "等待检测", delay: "-", last: "-", fail: 0 };
+    return statusMap[node.ip] ? { ...statusMap[node.ip] } : { name: node.name, ip: node.ip, status: "检测中", delay: "-", last: "-", fail: 0 };
+}
+
+function buildNodeStructure(nodes, isRunning) {
+    const html = nodes.map(n => `
+        <div class="node-card" data-ip="${escapeHtml(n.ip)}">
+          <button class="node-sort-handle" type="button" aria-label="拖动排序">
+            <span></span><span></span><span></span>
+          </button>
+          <div class="node-top-row">
+            <div class="node-identity">
+              <span class="node-name" title="${escapeHtml(n.name || '未命名')}">${escapeHtml(n.name || '未命名')}</span>
+              <div class="node-sub-info">
+                <span class="node-ip" onclick="copyText('${escapeHtml(n.ip)}')">${escapeHtml(n.ip)}</span>
+                <span class="node-location" data-ip="${escapeHtml(n.ip)}" onclick="toggleLocation(this)">查询归属地...</span>
+              </div>
+            </div>
+            <div class="node-status-wrapper">
+              <span class="badge-status-pill badge-checking node-status"><i class="dot"></i>${isRunning ? '检测中' : '等待检测'}</span>
+              <span class="delay-text node-delay">-</span>
+            </div>
+          </div>
+          <div class="node-bottom-row">
+            <div class="node-stats-group">
+              <span>最后检测: <strong class="stat-val node-last">-</strong></span>
+              <span class="fail-tag node-fail" hidden></span>
+            </div>
+            <div class="node-action-group">
+              <button class="action-btn-sm edit-btn" onclick="openEditModal('${escapeHtml(n.ip)}')">编辑</button>
+              <button class="action-btn-sm del-btn" onclick="delNode('${escapeHtml(n.ip)}')">删除</button>
+            </div>
+          </div>
+        </div>`).join('');
+
+    return '<div class="node-cards-grid' + (sortMode ? ' sorting' : '') + '">' + html + '</div>';
+}
+
+function updateNodeCard(card, item) {
+    if (!card) return;
+    const statusEl = card.querySelector('.node-status');
+    const delayEl = card.querySelector('.node-delay');
+    const lastEl = card.querySelector('.node-last');
+    const failEl = card.querySelector('.node-fail');
+    const status = item.status || "检测中";
+    const numDelay = parseInt(item.delay);
+    const badgeCls = status === "在线" ? "badge-online" : (status === "离线" ? "badge-offline" : "badge-checking");
+    const delayCls = !isNaN(numDelay) ? (numDelay < 150 ? 'delay-good' : (numDelay < 400 ? 'delay-medium' : 'delay-bad')) : "";
+    const failCount = parseInt(item.fail) || 0;
+
+    if (statusEl) {
+        statusEl.className = "badge-status-pill node-status " + badgeCls;
+        statusEl.innerHTML = '<i class="dot"></i>' + escapeHtml(status);
+    }
+    if (delayEl) {
+        delayEl.className = "delay-text node-delay " + delayCls;
+        delayEl.innerText = String(item.delay ?? "-");
+    }
+    if (lastEl) lastEl.innerText = String(item.last ?? "-");
+    if (failEl) {
+        failEl.hidden = failCount <= 0;
+        failEl.innerText = failCount > 0 ? `连续失败: ${failCount}次` : "";
+    }
+}
+
+function renderNodeStructureIfNeeded(nodes, isRunning) {
+    const signature = JSON.stringify({
+        nodes: nodes.map(n => ({ name: n.name || "", ip: n.ip || "" })),
+        running: !!isRunning,
+        sorting: !!sortMode
+    });
+    if (signature === lastConfigSignature) return;
+
+    const container = $("nodes-container");
+    if (!nodes.length) {
+        container.innerHTML = '<div class="ios-card" style="padding: 24px; text-align: center; color: var(--text-muted); font-size: 14px;"><span class="empty-pc">暂无监控节点，请在右侧添加</span><span class="empty-mobile">暂无监控节点，点击标题打开控制台添加</span></div>';
+        lastRenderedHTML = "";
+    } else {
+        const finalHTML = buildNodeStructure(nodes, isRunning);
+        container.innerHTML = finalHTML;
+        lastRenderedHTML = finalHTML;
+        const grid = container.querySelector(".node-cards-grid");
+        if (grid && sortMode) bindSortEvents(grid);
+    }
+    lastConfigSignature = signature;
+    lastNodesSnapshot = nodes.map(n => ({...n}));
+    locationGeneration++;
+    locationQueue = [];
+}
+
+function updateNodeCards(nodes, status, isRunning) {
+    const statusMap = {};
+    (status || []).forEach(n => statusMap[n.ip] = n);
+    let totalOnline = 0, totalOffline = 0, totalDelay = 0, delayCount = 0;
+
+    nodes.forEach(n => {
+        const item = nodeStatusData(n, statusMap, isRunning);
+        if (item.status === "在线") totalOnline++;
+        if (item.status === "离线") totalOffline++;
+        const numDelay = parseInt(item.delay);
+        if (!isNaN(numDelay)) { totalDelay += numDelay; delayCount++; }
+        const card = document.querySelector('.node-card[data-ip="' + cssEscape(n.ip) + '"]');
+        updateNodeCard(card, item);
+    });
+
+    $("stat-total").innerText = nodes.length;
+    $("stat-online").innerText = totalOnline;
+    $("stat-offline").innerText = totalOffline;
+    $("stat-delay").innerText = delayCount > 0 ? Math.round(totalDelay / delayCount) + " ms" : "-- ms";
+}
+
 async function refreshDashboard(isInitial = false) {
-    const [config, status, sysData, logsData] = await Promise.all([
-        fetchJSON("/api/config"), fetchJSON("/api/status"), fetchJSON("/api/system"), fetchJSON("/api/logs")
-    ]);
+    if (refreshInFlight) return;
+    refreshInFlight = true;
+    const seq = ++refreshSeq;
+    try {
+        const [config, status, sysData, logsData] = await Promise.all([
+            fetchJSON("/api/config"), fetchJSON("/api/status"), fetchJSON("/api/system"), fetchJSON("/api/logs")
+        ]);
+        if (seq !== refreshSeq) return;
 
-    if (sysData) {
-        const badge = $("service-status-badge"), uptimeEl = $("service-uptime"), dot = $("header-dot");
-        if (sysData.running) {
-            badge.className = "badge-status-pill badge-online"; badge.innerHTML = '<i class="dot"></i>运行中';
-            uptimeEl.style.color = "var(--text-main)"; uptimeEl.innerText = formatUptime(sysData.uptime);
-            if (dot) dot.style.backgroundColor = "var(--ios-green)";
-        } else {
-            badge.className = "badge-status-pill badge-offline"; badge.innerHTML = '<i class="dot"></i>已停止';
-            uptimeEl.innerText = "已停止"; uptimeEl.style.color = "var(--text-muted)";
-            if (dot) dot.style.backgroundColor = "var(--ios-red)";
-        }
-    }
-
-    if (config) {
-        const wIn = $("worker"), iIn = $("interval");
-        if (isInitial || document.activeElement !== wIn) wIn.value = config.worker || "";
-        if (isInitial || document.activeElement !== iIn) iIn.value = config.interval || 60;
-        
-        const isRunning = sysData && sysData.running;
-        const statusMap = {};
-        (status || []).forEach(n => statusMap[n.ip] = n);
-
-        let totalOnline = 0, totalOffline = 0, totalDelay = 0, delayCount = 0;
-        const nodes = config.nodes || [];
-        refreshIPLocations(nodes);
-        
-        const htmlParts = nodes.map(n => {
-            const item = !isRunning ? { name: n.name, ip: n.ip, status: "等待检测", delay: "-", last: "-", fail: 0 }
-                       : (statusMap[n.ip] ? { ...statusMap[n.ip] } : { name: n.name, ip: n.ip, status: "检测中", delay: "-", last: "-", fail: 0 });
-
-            if (item.status === "在线") totalOnline++;
-            if (item.status === "离线") totalOffline++;
-            const numDelay = parseInt(item.delay);
-            if (!isNaN(numDelay)) { totalDelay += numDelay; delayCount++; }
-
-            const badgeCls = item.status === "在线" ? "badge-online" : (item.status === "离线" ? "badge-offline" : "badge-checking");
-            const delayCls = !isNaN(numDelay) ? (numDelay < 150 ? 'delay-good' : (numDelay < 400 ? 'delay-medium' : 'delay-bad')) : "";
-            const failCount = parseInt(item.fail) || 0;
-
-            return `
-            <div class="node-card" data-ip="${escapeHtml(item.ip)}">
-              <button class="node-sort-handle" type="button" aria-label="拖动排序">
-                <span></span><span></span><span></span>
-              </button>
-              <div class="node-top-row">
-                <div class="node-identity">
-                  <span class="node-name" title="${escapeHtml(item.name || '未命名')}">${escapeHtml(item.name || '未命名')}</span>
-                  <div class="node-sub-info">
-                    <span class="node-ip" onclick="copyText('${escapeHtml(item.ip)}')">${escapeHtml(item.ip)}</span>
-                    <span class="node-location" id="location-${escapeHtml(item.ip)}" onclick="toggleLocation(this)">查询归属地...</span>
-                  </div>
-                </div>
-                <div class="node-status-wrapper">
-                  <span class="badge-status-pill ${badgeCls}">
-                    <i class="dot"></i>${escapeHtml(item.status)}
-                  </span>
-                  <span class="delay-text ${delayCls}">${escapeHtml(String(item.delay))}</span>
-                </div>
-              </div>
-              <div class="node-bottom-row">
-                <div class="node-stats-group">
-                  <span>最后检测: <strong class="stat-val">${escapeHtml(String(item.last))}</strong></span>
-                  ${failCount > 0 ? `<span class="fail-tag">连续失败: ${failCount}次</span>` : ''}
-                </div>
-                <div class="node-action-group">
-                  <button class="action-btn-sm edit-btn" onclick="openEditModal('${escapeHtml(item.ip)}')">编辑</button>
-                  <button class="action-btn-sm del-btn" onclick="delNode('${escapeHtml(item.ip)}')">删除</button>
-                </div>
-              </div>
-            </div>`;
-        });
-
-        $("stat-total").innerText = nodes.length;
-        $("stat-online").innerText = totalOnline;
-        $("stat-offline").innerText = totalOffline;
-        $("stat-delay").innerText = delayCount > 0 ? Math.round(totalDelay / delayCount) + " ms" : "-- ms";
-        $("last-update").innerText = "最后更新: " + new Date().toLocaleTimeString('zh-CN', { hour12: false });
-
-        const container = $("nodes-container");
-        if (nodes.length === 0) {
-            container.innerHTML = '<div class="ios-card" style="padding: 24px; text-align: center; color: var(--text-muted); font-size: 14px;"><span class="empty-pc">暂无监控节点，请在右侧添加</span><span class="empty-mobile">暂无监控节点，点击标题打开控制台添加</span></div>';
-            lastRenderedHTML = "";
-        } else {
-            const finalHTML = '<div class="node-cards-grid' + (sortMode ? ' sorting' : '') + '">' + htmlParts.join('') + '</div>';
-            if (finalHTML !== lastRenderedHTML) {
-                container.innerHTML = finalHTML;
-                lastRenderedHTML = finalHTML;
-                const grid = container.querySelector(".node-cards-grid");
-                if (grid && sortMode) {
-                    bindSortEvents(grid);
-                }
-            }
-        }
-    }
-
-    if (logsData) {
-        const box = $("logs");
-        const logsStr = (logsData || []).join("\n");
-        if (logsStr !== lastLogsText) {
-            lastLogsText = logsStr;
-            if (!logsData || logsData.length === 0) {
-                box.innerHTML = "暂无日志或日志已被清空。";
+        if (sysData) {
+            const badge = $("service-status-badge"), uptimeEl = $("service-uptime"), dot = $("header-dot");
+            if (sysData.running) {
+                badge.className = "badge-status-pill badge-online";
+                badge.innerHTML = '<i class="dot"></i>运行中';
+                uptimeEl.style.color = "var(--text-main)";
+                uptimeEl.innerText = formatUptime(sysData.uptime);
+                if (dot) dot.style.backgroundColor = "var(--ios-green)";
             } else {
-                box.innerHTML = logsData.map(line => escapeHtml(line)).join("<br>");
-                box.scrollTop = box.scrollHeight;
+                badge.className = "badge-status-pill badge-offline";
+                badge.innerHTML = '<i class="dot"></i>已停止';
+                uptimeEl.innerText = "已停止";
+                uptimeEl.style.color = "var(--text-muted)";
+                if (dot) dot.style.backgroundColor = "var(--ios-red)";
             }
         }
+
+        if (config) {
+            const wIn = $("worker"), iIn = $("interval");
+            if (isInitial || document.activeElement !== wIn) wIn.value = config.worker || "";
+            if (isInitial || document.activeElement !== iIn) iIn.value = config.interval || 60;
+
+            const isRunning = !!(sysData && sysData.running);
+            const nodes = config.nodes || [];
+            renderNodeStructureIfNeeded(nodes, isRunning);
+            updateNodeCards(nodes, status, isRunning);
+            refreshIPLocations(nodes);
+            $("last-update").innerText = "最后更新: " + new Date().toLocaleTimeString('zh-CN', { hour12: false });
+        }
+
+        if (logsData) updateLogs(logsData);
+    } finally {
+        refreshInFlight = false;
     }
+}
+
+function updateLogs(logsData) {
+    const box = $("logs");
+    const lines = Array.isArray(logsData) ? logsData : [];
+    const trimmed = lines.slice(-MAX_LOG_LINES);
+    const logsStr = trimmed.join("\n");
+    if (logsStr === lastLogsText) return;
+    lastLogsText = logsStr;
+    logLinesCache = trimmed;
+
+    const nearBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 40;
+    if (!trimmed.length) {
+        box.innerText = "暂无日志或日志已被清空。";
+        return;
+    }
+
+    const fragment = document.createDocumentFragment();
+    trimmed.forEach((line, index) => {
+        if (index) fragment.appendChild(document.createElement("br"));
+        fragment.appendChild(document.createTextNode(String(line)));
+    });
+    box.replaceChildren(fragment);
+    if (nearBottom || box.scrollHeight <= box.clientHeight) box.scrollTop = box.scrollHeight;
 }
 
 async function apiPost(url, data, successMsg) {
@@ -814,14 +992,8 @@ async function addNode(){
     
     const result = await apiPost("/api/add", { name, ip }, "节点添加成功");
     if (result) {
-        $("name").value = ""; $("ip").value = "";
-        try {
-            const sysRes = await fetch("/api/system");
-            const sysData = await sysRes.json().catch(() => ({}));
-            if (sysData && sysData.running) {
-                await refreshDashboard();
-            }
-        } catch(e) {}
+        $("name").value = "";
+        $("ip").value = "";
     }
 }
 
@@ -891,12 +1063,16 @@ function toggleSortMode() {
     const btn = $("sort-toggle-btn");
     btn.classList.toggle("active", sortMode);
     btn.innerText = sortMode ? "完成" : "排序";
+
     const grid = document.querySelector(".node-cards-grid");
     if (grid) {
         grid.classList.toggle("sorting", sortMode);
-        bindSortEvents(grid);
-        if (!sortMode) clearSortDrag();
+        if (sortMode) bindSortEvents(grid);
+        else clearSortDrag();
     }
+    // 仅更新排序相关样式，不重新拉取数据。
+    lastConfigSignature = "";
+    if (!sortMode) refreshDashboard();
 }
 
 function clearSortDrag() {
@@ -1073,6 +1249,38 @@ drawerContent.addEventListener("touchstart", e => onTouchStart(e, true), { passi
 drawerContent.addEventListener("touchmove", onTouchMove, { passive: false });
 drawerContent.addEventListener("touchend", onTouchEnd);
 
+
+/* ===== 控制面板：点击其他区域自动关闭 ===== */
+function closeDrawerByOutsideClick(e) {
+    if (!isExpanded) return;
+    if (!isMobile()) return;
+
+    const target = e.target;
+
+    // 控制面板自身、控制面板头部、遮罩层内部点击不重复处理
+    if (drawer.contains(target)) return;
+
+    // 点击控制面板之外的页面内容：关闭
+    toggleDrawer(false);
+}
+
+document.addEventListener("click", closeDrawerByOutsideClick, true);
+
+// PC 端也支持：控制面板打开后，点击页面其他位置关闭。
+// 不影响控制面板内部按钮操作。
+document.addEventListener("mousedown", (e) => {
+    if (!isExpanded || isMobile()) return;
+    if (drawer.contains(e.target)) return;
+    toggleDrawer(false);
+}, true);
+
+// 打开控制面板后，按 ESC 关闭
+document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && isExpanded) {
+        toggleDrawer(false);
+    }
+});
+
 window.addEventListener('resize', () => {
     drawer.style.transform = ""; overlay.style.opacity = ""; drawer.classList.remove("dragging");
     if (!isMobile()) {
@@ -1087,13 +1295,29 @@ window.addEventListener('resize', () => {
 });
 
 refreshDashboard(true);
-let pollTimer = setInterval(refreshDashboard, 5000);
+
+function startPolling() {
+    if (pollTimer) return;
+    pollTimer = setInterval(() => {
+        if (!document.hidden && !sortMode) refreshDashboard();
+    }, 5000);
+}
+
+function stopPolling() {
+    if (pollTimer) {
+        clearInterval(pollTimer);
+        pollTimer = null;
+    }
+}
+
+let pollTimer = null;
+startPolling();
 
 document.addEventListener("visibilitychange", () => {
-    if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+    stopPolling();
     if (!document.hidden) {
         refreshDashboard();
-        pollTimer = setInterval(refreshDashboard, 5000);
+        startPolling();
     }
 });
 </script>
