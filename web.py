@@ -7,6 +7,11 @@ import json
 import os
 import subprocess
 import time
+import socket
+import ipaddress
+import threading
+from urllib.request import Request, urlopen
+from urllib.parse import quote
 
 # 应用启动时间标识
 APP_START_TIME = time.time()
@@ -17,6 +22,9 @@ CONFIG_FILE = os.path.join(BASE_DIR, "config.json")
 LOG_FILE = os.path.join(BASE_DIR, "logs", "monitor.log")
 STATUS_FILE = os.path.join(BASE_DIR, "status.json")
 LAST_ACTION_FILE = os.path.join(BASE_DIR, "last_action.json")
+IP_CACHE_FILE = os.path.join(BASE_DIR, "ip_cache.json")
+IP_CACHE_LOCK = threading.Lock()
+IP_API_URL = "http://ip-api.com/json/"
 
 app = Flask(__name__, template_folder="templates")
 
@@ -75,6 +83,138 @@ def save_json_atomic(filepath, data):
         if os.path.exists(temp_file):
             os.remove(temp_file)
         raise e
+
+
+
+
+def load_ip_cache():
+    """读取 IP 归属地永久缓存。"""
+    if not os.path.exists(IP_CACHE_FILE):
+        return {}
+    try:
+        with open(IP_CACHE_FILE, "r", encoding="utf-8") as f:
+            data = json.load(f)
+            return data if isinstance(data, dict) else {}
+    except Exception as e:
+        print(f"[IP Cache Error] 读取缓存失败: {e}")
+        return {}
+
+
+def save_ip_cache(cache):
+    """原子化保存 IP 归属地缓存。"""
+    save_json_atomic(IP_CACHE_FILE, cache)
+
+
+def normalize_lookup_target(target):
+    """IP 直接使用；域名由服务器端 DNS 解析为一个可查询 IP。"""
+    target = str(target or "").strip()
+    if not target:
+        return "", ""
+
+    # 允许用户输入 [IPv6] 形式。
+    candidate = target[1:-1] if target.startswith("[") and target.endswith("]") else target
+    try:
+        return target, str(ipaddress.ip_address(candidate))
+    except ValueError:
+        pass
+
+    try:
+        infos = socket.getaddrinfo(target, None, type=socket.SOCK_STREAM)
+        # 优先 IPv4，与大多数 VPS 节点录入习惯保持一致；没有 IPv4 再使用 IPv6。
+        addresses = []
+        for info in infos:
+            addr = info[4][0]
+            if addr not in addresses:
+                addresses.append(addr)
+        ipv4 = next((x for x in addresses if ":" not in x), None)
+        resolved = ipv4 or (addresses[0] if addresses else "")
+        return target, resolved
+    except Exception:
+        return target, ""
+
+
+
+# 归属地中文映射（沿用原前端显示规则，迁移到后端）
+COUNTRY_ZH = {
+    "CN":"中国", "HK":"中国香港", "MO":"中国澳门", "TW":"中国台湾", "JP":"日本", "KR":"韩国", "SG":"新加坡", "US":"美国", "CA":"加拿大", "GB":"英国", "DE":"德国", "FR":"法国", "NL":"荷兰", "RU":"俄罗斯", "AU":"澳大利亚", "NZ":"新西兰", "IN":"印度", "MY":"马来西亚", "TH":"泰国", "VN":"越南", "ID":"印度尼西亚", "PH":"菲律宾", "AE":"阿联酋", "TR":"土耳其", "BR":"巴西", "AR":"阿根廷", "MX":"墨西哥", "IT":"意大利", "ES":"西班牙", "SE":"瑞典", "CH":"瑞士", "NO":"挪威", "FI":"芬兰", "DK":"丹麦", "PL":"波兰", "UA":"乌克兰", "IE":"爱尔兰", "AT":"奥地利", "BE":"比利时", "CZ":"捷克", "RO":"罗马尼亚", "ZA":"南非", "IL":"以色列", "PT":"葡萄牙", "GR":"希腊", "HU":"匈牙利", "BG":"保加利亚", "RS":"塞尔维亚", "SK":"斯洛伐克", "SI":"斯洛文尼亚", "HR":"克罗地亚", "LT":"立陶宛", "LV":"拉脱维亚", "EE":"爱沙尼亚", "IS":"冰岛", "LU":"卢森堡", "MT":"马耳他", "CY":"塞浦路斯", "GE":"格鲁吉亚", "AM":"亚美尼亚", "AZ":"阿塞拜疆", "KZ":"哈萨克斯坦", "UZ":"乌兹别克斯坦", "PK":"巴基斯坦", "BD":"孟加拉国", "LK":"斯里兰卡", "NP":"尼泊尔", "MM":"缅甸", "KH":"柬埔寨", "LA":"老挝", "MN":"蒙古", "SA":"沙特阿拉伯", "QA":"卡塔尔", "KW":"科威特", "OM":"阿曼", "BH":"巴林", "JO":"约旦", "LB":"黎巴嫩", "EG":"埃及", "MA":"摩洛哥", "DZ":"阿尔及利亚", "TN":"突尼斯", "KE":"肯尼亚", "NG":"尼日利亚", "GH":"加纳", "ET":"埃塞俄比亚", "CL":"智利", "PE":"秘鲁", "CO":"哥伦比亚", "VE":"委内瑞拉", "UY":"乌拉圭", "PY":"巴拉圭", "BO":"玻利维亚", "EC":"厄瓜多尔", "CR":"哥斯达黎加", "PA":"巴拿马", "DO":"多米尼加共和国", "GT":"危地马拉", "CU":"古巴", "JM":"牙买加", "PR":"波多黎各"
+}
+
+REGION_ZH = {
+    # 日本
+    "Tokyo":"东京", "Osaka":"大阪", "Kyoto":"京都", "Hokkaido":"北海道", "Aichi":"爱知县", "Kanagawa":"神奈川县", "Saitama":"埼玉县", "Chiba":"千叶县", "Fukuoka":"福冈县", "Hyogo":"兵库县",
+    # 中国大陆
+    "Guangdong":"广东省", "Jiangsu":"江苏省", "Zhejiang":"浙江省", "Beijing":"北京市", "Shanghai":"上海市", "Shandong":"山东省", "Fujian":"福建省", "Sichuan":"四川省", "Hubei":"湖北省", "Hunan":"湖南省", "Anhui":"安徽省", "Jiangxi":"江西省", "Henan":"河南省", "Hebei":"河北省", "Shanxi":"山西省", "Liaoning":"辽宁省", "Jilin":"吉林省", "Heilongjiang":"黑龙江省", "Shaanxi":"陕西省", "Gansu":"甘肃省", "Qinghai":"青海省", "Yunnan":"云南省", "Guizhou":"贵州省", "Guangxi":"广西壮族自治区", "Inner Mongolia":"内蒙古自治区", "Xinjiang":"新疆维吾尔自治区", "Tibet":"西藏自治区", "Ningxia":"宁夏回族自治区",
+    # 港澳台
+    "Hong Kong":"香港", "Macau":"澳门", "Taiwan":"台湾", "Kowloon":"九龙", "New Territories":"新界", "Kwai Tsing District":"葵青区", "Central and Western District":"中西区", "Eastern District":"东区", "Southern District":"南区", "Wan Chai District":"湾仔区", "Sham Shui Po District":"深水埗区", "Wong Tai Sin District":"黄大仙区", "Yau Tsim Mong District":"油尖旺区", "Kowloon City District":"九龙城区", "Kwun Tong District":"观塘区", "Sai Kung District":"西贡区", "Sha Tin District":"沙田区", "Tai Po District":"大埔区", "Tsuen Wan District":"荃湾区", "Tuen Mun District":"屯门区", "Yuen Long District":"元朗区", "North District":"北区", "Islands District":"离岛区",
+    # 美国常见州
+    "Alabama":"阿拉巴马州", "Alaska":"阿拉斯加州", "Arizona":"亚利桑那州", "Arkansas":"阿肯色州", "California":"加利福尼亚州", "Colorado":"科罗拉多州", "Connecticut":"康涅狄格州", "Delaware":"特拉华州", "Florida":"佛罗里达州", "Georgia":"佐治亚州", "Hawaii":"夏威夷州", "Idaho":"爱达荷州", "Illinois":"伊利诺伊州", "Indiana":"印第安纳州", "Iowa":"艾奥瓦州", "Kansas":"堪萨斯州", "Kentucky":"肯塔基州", "Louisiana":"路易斯安那州", "Maine":"缅因州", "Maryland":"马里兰州", "Massachusetts":"马萨诸塞州", "Michigan":"密歇根州", "Minnesota":"明尼苏达州", "Mississippi":"密西西比州", "Missouri":"密苏里州", "Montana":"蒙大拿州", "Nebraska":"内布拉斯加州", "Nevada":"内华达州", "New Hampshire":"新罕布什尔州", "New Jersey":"新泽西州", "New Mexico":"新墨西哥州", "New York":"纽约州", "North Carolina":"北卡罗来纳州", "North Dakota":"北达科他州", "Ohio":"俄亥俄州", "Oklahoma":"俄克拉何马州", "Oregon":"俄勒冈州", "Pennsylvania":"宾夕法尼亚州", "Rhode Island":"罗得岛州", "South Carolina":"南卡罗来纳州", "South Dakota":"南达科他州", "Tennessee":"田纳西州", "Texas":"得克萨斯州", "Utah":"犹他州", "Vermont":"佛蒙特州", "Virginia":"弗吉尼亚州", "Washington":"华盛顿州", "West Virginia":"西弗吉尼亚州", "Wisconsin":"威斯康星州", "Wyoming":"怀俄明州", "District of Columbia":"哥伦比亚特区",
+    # 其他常见地区
+    "Ontario":"安大略省", "Quebec":"魁北克省", "British Columbia":"不列颠哥伦比亚省", "England":"英格兰", "Scotland":"苏格兰", "Wales":"威尔士", "Bavaria":"巴伐利亚州", "Hesse":"黑森州", "Île-de-France":"法兰西岛大区", "Seoul":"首尔特别市", "Busan":"釜山广域市", "Gyeonggi":"京畿道", "Singapore":"新加坡"
+}
+
+CITY_ZH = {
+    "Tokyo":"东京", "Osaka":"大阪", "Kyoto":"京都", "Nagoya":"名古屋", "Yokohama":"横滨", "Sapporo":"札幌", "Fukuoka":"福冈", "Kobe":"神户", "Hong Kong":"香港", "Macau":"澳门", "Taipei":"台北", "Kaohsiung":"高雄", "Beijing":"北京", "Shanghai":"上海", "Guangzhou":"广州", "Shenzhen":"深圳", "Nanjing":"南京", "Nanjing City":"南京", "Suzhou":"苏州", "Wuxi":"无锡", "Hangzhou":"杭州", "Ningbo":"宁波", "Wenzhou":"温州", "Hefei":"合肥", "Jinan":"济南", "Qingdao":"青岛", "Zhengzhou":"郑州", "Wuhan":"武汉", "Changsha":"长沙", "Nanchang":"南昌", "Fuzhou":"福州", "Xiamen":"厦门", "Chengdu":"成都", "Chongqing":"重庆", "Xi'an":"西安", "Xian":"西安", "Shenyang":"沈阳", "Dalian":"大连", "Harbin":"哈尔滨", "Changchun":"长春", "Kunming":"昆明", "Guiyang":"贵阳", "Nanning":"南宁", "Urumqi":"乌鲁木齐", "Lanzhou":"兰州", "Xining":"西宁", "Yinchuan":"银川", "Hohhot":"呼和浩特", "Los Angeles":"洛杉矶", "San Francisco":"旧金山", "New York":"纽约", "Chicago":"芝加哥", "Seattle":"西雅图", "Houston":"休斯顿", "Dallas":"达拉斯", "Miami":"迈阿密", "Boston":"波士顿", "Washington":"华盛顿", "Vancouver":"温哥华", "Toronto":"多伦多", "Montreal":"蒙特利尔", "London":"伦敦", "Manchester":"曼彻斯特", "Paris":"巴黎", "Frankfurt":"法兰克福", "Berlin":"柏林", "Amsterdam":"阿姆斯特丹", "Moscow":"莫斯科", "Sydney":"悉尼", "Melbourne":"墨尔本", "Singapore":"新加坡", "Seoul":"首尔", "Busan":"釜山", "Bangkok":"曼谷", "Kuala Lumpur":"吉隆坡", "Jakarta":"雅加达", "Manila":"马尼拉", "Dubai":"迪拜", "Istanbul":"伊斯坦布尔", "Madrid":"马德里", "Barcelona":"巴塞罗那", "Rome":"罗马", "Milan":"米兰", "Zurich":"苏黎世", "Vienna":"维也纳", "Prague":"布拉格", "Warsaw":"华沙", "Stockholm":"斯德哥尔摩", "Oslo":"奥斯陆", "Helsinki":"赫尔辛基", "Copenhagen":"哥本哈根", "Dublin":"都柏林", "Lisbon":"里斯本", "Athens":"雅典", "Salt Lake City":"盐湖城", "Kwai Chung":"葵涌", "Tsuen Wan":"荃湾", "Tsing Yi":"青衣", "Sha Tin":"沙田", "Tuen Mun":"屯门", "Yuen Long":"元朗", "Tai Po":"大埔", "Central":"中环", "Causeway Bay":"铜锣湾", "Mong Kok":"旺角", "Kowloon":"九龙"
+}
+IP_CACHE_VERSION = 4
+
+def zh_location(value, mapping):
+    value = str(value or "").strip()
+    return mapping.get(value, value)
+
+def format_ip_location(data):
+    """智能中文归属地：翻译、行政层级去重、港澳台专项处理。"""
+    country_code = str(data.get("countryCode") or "").strip().upper()
+    country_raw = str(data.get("country") or "").strip()
+    region_raw = str(data.get("regionName") or data.get("region") or "").strip()
+    city_raw = str(data.get("city") or "").strip()
+
+    country = COUNTRY_ZH.get(country_code, country_raw)
+    region = zh_location(region_raw, REGION_ZH)
+    city = zh_location(city_raw, CITY_ZH)
+
+    # 规范化特殊地区显示。
+    if country_code == "HK":
+        country = "中国香港"
+        # ip-api 常把 city 也返回 Hong Kong，避免“中国香港 香港/九龙 香港”这种重复。
+        if city_raw.lower() in {"hong kong", "hongkong"} or city == "香港":
+            city = ""
+        if region in {"香港", "中国香港"}:
+            region = ""
+    elif country_code == "MO":
+        country = "中国澳门"
+        if city_raw.lower() in {"macau", "macao"} or city == "澳门":
+            city = ""
+        if region in {"澳门", "中国澳门"}:
+            region = ""
+    elif country_code == "TW":
+        country = "中国台湾"
+        if region in {"台湾", "中国台湾"}:
+            region = ""
+
+    # 通用去重：原始值或翻译值重复都只保留一次。
+    parts = []
+    for value in (country, region, city):
+        value = str(value or "").strip()
+        if value and value not in parts:
+            parts.append(value)
+
+    org = str(data.get("isp") or data.get("org") or data.get("asname") or "").strip()
+    location = " ".join(parts)
+    if org:
+        location += (" · " if location else "") + org
+    return location or "未知"
+
+def query_ip_api(ip):
+    params = "?fields=status,message,country,countryCode,region,regionName,city,isp,org,asname,query"
+    url = IP_API_URL + quote(ip, safe="") + params
+    req = Request(url, headers={"Accept": "application/json", "User-Agent": "PingMonitor/1.0"})
+    with urlopen(req, timeout=8) as resp:
+        if resp.status != 200:
+            return None
+        data = json.loads(resp.read().decode("utf-8", errors="replace"))
+        if not isinstance(data, dict) or data.get("status") != "success":
+            return None
+        return data
 
 
 def get_last_action():
@@ -310,6 +450,53 @@ def interval():
     except Exception as e:
         write_log(f"更新检测频率失败: {str(e)}")
         return jsonify({"ok": False, "error": str(e)})
+
+
+
+
+@app.route("/api/location/<path:target>")
+def ip_location(target):
+    """服务器端查询 ip-api.com，并永久缓存成功结果。"""
+    original_target, resolved_ip = normalize_lookup_target(target)
+    if not original_target or not resolved_ip:
+        return jsonify({"ok": False, "location": "未知", "error": "无法解析 IP 或域名"}), 400
+
+    cache_key = original_target
+    with IP_CACHE_LOCK:
+        cache = load_ip_cache()
+        cached = cache.get(cache_key)
+        if isinstance(cached, dict) and cached.get("location") and cached.get("version") == IP_CACHE_VERSION:
+            return jsonify({
+                "ok": True,
+                "location": cached["location"],
+                "ip": cached.get("ip", resolved_ip),
+                "cached": True
+            })
+
+    try:
+        data = query_ip_api(resolved_ip)
+        if not data:
+            raise RuntimeError("ip-api.com 返回空数据")
+
+        location = format_ip_location(data)
+        if location == "未知":
+            return jsonify({"ok": False, "location": "未知", "ip": resolved_ip}), 502
+
+        entry = {
+            "location": location,
+            "ip": resolved_ip,
+            "updated_at": int(time.time()),
+            "version": IP_CACHE_VERSION
+        }
+        with IP_CACHE_LOCK:
+            cache = load_ip_cache()
+            cache[cache_key] = entry
+            save_ip_cache(cache)
+
+        return jsonify({"ok": True, "location": location, "ip": resolved_ip, "cached": False})
+    except Exception as e:
+        print(f"[IP Location Error] 查询 {original_target} ({resolved_ip}) 失败: {e}")
+        return jsonify({"ok": False, "location": "查询失败", "ip": resolved_ip}), 502
 
 
 @app.route("/api/status")
