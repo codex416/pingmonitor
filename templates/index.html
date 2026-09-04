@@ -27,11 +27,11 @@
     width: 100%;
   }
   .main-wrapper { max-width: 1320px; margin: 0 auto; padding: 0 20px calc(80px + env(safe-area-inset-bottom)); background-color: var(--ios-bg); width: 100%; overflow: hidden; }
-  .ios-large-header { padding-top: calc(env(safe-area-inset-top) + 20px); padding-bottom: 12px; cursor: pointer; user-select: none; }
-  .large-title { font-size: 32px; font-weight: 800; letter-spacing: -0.6px; color: var(--text-main); line-height: 1.1; }
-  .header-sub-row { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
+  .ios-large-header { padding-top: calc(env(safe-area-inset-top) + 20px); padding-bottom: 16px; cursor: pointer; user-select: none; display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+  .large-title { font-size: 28px; font-weight: 800; letter-spacing: -0.6px; color: var(--text-main); line-height: 1.1; }
+  .header-sub-row { display: flex; align-items: center; gap: 8px; margin-top: 0; flex-shrink: 0; }
   .status-dot { width: 8px; height: 8px; border-radius: 50%; background-color: var(--ios-green); display: inline-block; flex-shrink: 0; transition: background-color 0.3s ease; }
-  .last-update-text { font-size: 13px; color: var(--text-muted); font-weight: 400; }
+  .last-update-text { font-size: 12px; color: var(--text-muted); font-weight: 400; }
   .desktop-control-btn { display: none; }
   
   .group-title { font-size: 13px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: -0.1px; margin: 24px 2px 12px; }
@@ -54,7 +54,7 @@
   .node-card {
     background: var(--card-bg);
     border-radius: var(--card-radius);
-    padding: 16px 18px;
+    padding: 28px 30px;
     box-shadow: 0 2px 10px rgba(0,0,0,0.025);
     display: flex;
     flex-direction: column;
@@ -205,7 +205,7 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding-top: 10px;
+    padding-top: 20px;
     border-top: 1px solid var(--divider-color);
     width: 100%;
   }
@@ -419,6 +419,66 @@
 #drawer-overlay.open,
 .drawer-overlay.open {
     pointer-events: auto;
+}
+
+
+/* ===== 节点卡片密度与顶部标题最终优化 ===== */
+.node-card { padding: 19px 22px; gap: 15px; }
+.node-identity { gap: 5px; }
+.node-sub-info { gap: 5px; }
+.node-bottom-row { padding-top: 7px; }
+.node-stats-group { gap: 6px; font-size: 11px; }
+.node-action-group { gap: 7px; }
+
+/* 顶部标题与更新时间同一行，PC 为控制按钮预留空间 */
+.ios-large-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding-right: 0;
+}
+.header-sub-row { margin-top: 0; flex-shrink: 0; }
+@media (min-width: 992px) {
+  .ios-large-header { padding-right: 150px; min-height: 64px; }
+  .large-title { font-size: 27px; }
+  .last-update-text { font-size: 12px; }
+  .desktop-control-btn { top: 22px; }
+}
+@media (max-width: 991px) {
+  .node-card { padding: 18px 18px; gap: 14px; }
+  .node-bottom-row { padding-top: 7px; }
+}
+
+
+/* ===== 顶部标题栏：PC 三项同一水平线 ===== */
+@media (min-width: 992px) {
+  .ios-large-header {
+    height: 72px;
+    min-height: 72px;
+    padding: 0 150px 0 0 !important;
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+  }
+  .large-title {
+    font-size: 26px !important;
+    line-height: 1 !important;
+    flex-shrink: 0;
+  }
+  .header-sub-row {
+    margin: 0 !important;
+    height: 38px;
+    display: flex !important;
+    align-items: center !important;
+    white-space: nowrap;
+  }
+  .desktop-control-btn {
+    top: 17px !important;
+    right: 20px !important;
+    height: 38px !important;
+  }
 }
 
 </style>
