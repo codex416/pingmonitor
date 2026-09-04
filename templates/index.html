@@ -99,6 +99,14 @@
     color: var(--text-muted);
     width: 100%;
   }
+  .node-ip-wrap { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .ip-type-badge {
+    display: inline-flex; align-items: center; justify-content: center;
+    min-width: 34px; height: 20px; padding: 0 6px; border-radius: 5px;
+    font-size: 10px; font-weight: 700; line-height: 1; flex-shrink: 0;
+  }
+  .ip-type-v4 { color: #007aff; background: rgba(0,122,255,0.10); }
+  .ip-type-v6 { color: #5856d6; background: rgba(88,86,214,0.10); }
   .node-ip {
     font-family: SFMono-Regular, Monaco, Consolas, monospace;
     font-weight: 500;
@@ -117,20 +125,25 @@
     color: var(--ios-blue);
     background: rgba(0, 122, 255, 0.1);
   }
-  .node-ip::after {
-    content: '';
-    display: inline-block;
-    width: 10px;
-    height: 10px;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%20%238e8e93' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='9' y='9' width='13' height='13' rx='2' ry='2'%3E%3C/rect%3E%3Cpath d='M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1'%3E%3C/path%3E%3C/svg%3E");
-    background-size: contain;
-    background-repeat: no-repeat;
-    opacity: 0.6;
-  }
+
 
   /* ----------------------------------------------------
      修改：归属地独立占满第二行、超过部分截断可点击展开
   ---------------------------------------------------- */
+
+  .node-ip-link {
+    border: none; font: inherit; color: inherit; cursor: pointer; background: transparent; padding: 0;
+    text-align: left; text-decoration: none;
+  }
+  .node-ip-link:hover { color: var(--ios-blue); }
+  .node-ip-copy {
+    width: 24px; height: 24px; border: none; background: rgba(120,120,128,0.08); border-radius: 5px;
+    cursor: pointer; display: inline-flex; align-items: center; justify-content: center; color: #8e8e93;
+    flex-shrink: 0;
+  }
+  .node-ip-copy:hover { color: var(--ios-blue); background: rgba(0,122,255,0.10); }
+  .node-ip-copy::before { content: '⧉'; font-size: 16px; line-height: 1; }
+
   .node-location {
     font-size: 12px;
     color: #8e8e93;
@@ -657,6 +670,21 @@ function nodeStatusData(node, statusMap, isRunning) {
     return statusMap[node.ip] ? { ...statusMap[node.ip] } : { name: node.name, ip: node.ip, status: "检测中", delay: "-", last: "-", fail: 0 };
 }
 
+function getIPType(ip) {
+    try {
+        const value = String(ip || '').trim().replace(/^\[|\]$/g, '');
+        return value.includes(':') ? 'IPv6' : 'IPv4';
+    } catch { return 'IPv4'; }
+}
+
+function openITDog(ip) {
+    const value = String(ip || '').trim().replace(/^\[|\]$/g, '');
+    if (!value) return;
+    const isIPv6 = value.includes(':');
+    const base = isIPv6 ? 'https://www.itdog.cn/ping_ipv6/' : 'https://www.itdog.cn/ping/';
+    window.open(base + value, '_blank', 'noopener');
+}
+
 function buildNodeStructure(nodes, isRunning) {
     const html = nodes.map(n => `
         <div class="node-card" data-ip="${escapeHtml(n.ip)}">
@@ -667,7 +695,11 @@ function buildNodeStructure(nodes, isRunning) {
             <div class="node-identity">
               <span class="node-name" title="${escapeHtml(n.name || '未命名')}">${escapeHtml(n.name || '未命名')}</span>
               <div class="node-sub-info">
-                <span class="node-ip" onclick="copyText('${escapeHtml(n.ip)}')">${escapeHtml(n.ip)}</span>
+                <div class="node-ip-wrap">
+                  <span class="ip-type-badge ${getIPType(n.ip) === 'IPv6' ? 'ip-type-v6' : 'ip-type-v4'}">${getIPType(n.ip)}</span>
+                  <span class="node-ip"><button class="node-ip-link" type="button" title="点击跳转 ITDOG 检测" onclick="openITDog('${escapeHtml(n.ip)}')">${escapeHtml(n.ip)}</button></span>
+                  <button class="node-ip-copy" type="button" title="复制 IP" aria-label="复制 IP" onclick="copyText('${escapeHtml(n.ip)}')"></button>
+                </div>
                 <span class="node-location" data-ip="${escapeHtml(n.ip)}" onclick="toggleLocation(this)">查询归属地...</span>
               </div>
             </div>
