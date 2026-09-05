@@ -27,14 +27,14 @@
     width: 100%;
   }
   .main-wrapper { max-width: 1320px; margin: 0 auto; padding: 0 20px calc(80px + env(safe-area-inset-bottom)); background-color: var(--ios-bg); width: 100%; overflow: hidden; }
-  .ios-large-header { padding-top: calc(env(safe-area-inset-top) + 20px); padding-bottom: 16px; cursor: pointer; user-select: none; display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+  .ios-large-header { padding-top: calc(env(safe-area-inset-top) + 16px); padding-bottom: 8px; cursor: pointer; user-select: none; display: flex; align-items: center; justify-content: space-between; gap: 16px; }
   .large-title { font-size: 28px; font-weight: 800; letter-spacing: -0.6px; color: var(--text-main); line-height: 1.1; }
   .header-sub-row { display: flex; align-items: center; gap: 8px; margin-top: 0; flex-shrink: 0; }
   .status-dot { width: 8px; height: 8px; border-radius: 50%; background-color: var(--ios-green); display: inline-block; flex-shrink: 0; transition: background-color 0.3s ease; }
   .last-update-text { font-size: 12px; color: var(--text-muted); font-weight: 400; }
   .desktop-control-btn { display: none; }
   
-  .group-title { font-size: 13px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: -0.1px; margin: 24px 2px 12px; }
+  .group-title { font-size: 13px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: -0.1px; margin: 16px 2px 8px; }
   .group-title.middle-title { margin-top: 36px !important; margin-bottom: 12px !important; }
   
   .widget-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
@@ -226,11 +226,27 @@
     font-weight: 600;
   }
 
+  /* 默认隐藏节点编辑/删除操作，但保留占位空间，确保卡片尺寸始终一致 */
   .node-action-group {
+    visibility: hidden;
+    opacity: 0;
+    pointer-events: none;
     display: flex;
     align-items: center;
     gap: 8px;
     flex-shrink: 0;
+  }
+
+  /* 「节点管理」模式：显示编辑、删除按钮 */
+  .node-cards-grid.sorting .node-action-group {
+    visibility: visible;
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  /* 「节点管理」模式：显示编辑、删除按钮 */
+  .node-cards-grid.sorting .node-action-group {
+    display: flex;
   }
   .action-btn-sm {
     height: 28px;
@@ -277,8 +293,9 @@
   }
   .node-sort-handle span { display: block; width: 16px; height: 2px; border-radius: 2px; background: currentColor; }
   
+  /* 仅在「节点管理」模式下启用拖动排序 */
   .node-cards-grid.sorting .node-sort-handle { display: flex; }
-  .node-cards-grid.sorting .node-card { 
+  .node-cards-grid.sorting .node-card {
     padding-left: 38px !important;
     border: 1px dashed rgba(0,122,255,0.4);
   }
@@ -306,7 +323,7 @@
   
   @media (max-width: 991px) {
     .dashboard-grid { display: flex; flex-direction: column; gap: 16px; }
-    .main-section { display: flex; flex-direction: column; gap: 16px; }
+    .main-section { display: flex; flex-direction: column; gap: 8px; }
     .drawer-overlay {
       position: fixed; top: 0; left: 0; right: 0; bottom: 0; width: 100vw; height: 100vh; height: 100dvh;
       background: rgba(0,0,0,0.45); opacity: 0; visibility: hidden; pointer-events: none;
@@ -481,6 +498,61 @@
   }
 }
 
+
+/* ===== 标题与卡片间距统一：系统状态概览 = 监控节点列表 ===== */
+.node-list-header {
+  margin-top: 16px;
+  margin-bottom: 8px;
+}
+.node-list-header .group-title {
+  margin: 0 2px !important;
+}
+
+/* 保持监控节点列表与排序按钮严格同一水平线 */
+.node-list-header {
+  align-items: center !important;
+}
+
+/* ===== 节点 IP 与在线状态优化 ===== */
+.node-ip {
+  font-family: "DengXian", "等线", sans-serif !important;
+  color: #000 !important;
+  text-shadow: none !important;
+  box-shadow: none !important;
+}
+.node-ip-link { color: #000 !important; text-shadow: none !important; }
+.node-ip-copy, .node-ip-copy:hover { box-shadow: none !important; filter: none !important; }
+.node-status-wrapper { display: contents !important; }
+.node-name { display: inline-flex !important; align-items: center; gap: 7px; }
+.node-status-dot {
+  width: 9px;
+  height: 9px;
+  min-width: 9px;
+  border-radius: 50%;
+  display: inline-block;
+  box-shadow: none !important;
+}
+.node-status-dot.badge-online { background: var(--ios-green) !important; }
+.node-status-dot.badge-offline { background: var(--ios-red) !important; }
+.node-status-dot.badge-checking { background: var(--ios-orange) !important; }
+.node-delay { margin-left: auto; }
+
+
+/* ===== PC端 IP 字体强制统一（正式覆盖） ===== */
+@media (min-width: 992px) {
+  .node-ip,
+  .node-ip .node-ip-link,
+  .node-ip-link {
+    font-family: "DengXian", "等线", sans-serif !important;
+    font-size: inherit !important;
+    font-weight: 600 !important;
+    color: #000 !important;
+    text-shadow: none !important;
+    -webkit-text-stroke: 0 !important;
+    opacity: 1 !important;
+  }
+}
+
 </style>
 <link rel="icon" type="image/webp" sizes="32x32" href="https://free.boltp.com/2026/08/06/6a744b5ca9f18.webp">
 <link rel="shortcut icon" href="https://free.boltp.com/2026/08/06/6a744b5ca9f18.webp">
@@ -509,8 +581,8 @@
   <div class="dashboard-grid">
     <div class="main-section">
       <div class="node-list-header">
-        <div class="group-title" style="margin-bottom:12px;">监控节点列表</div>
-        <button class="node-sort-btn" id="sort-toggle-btn" type="button" onclick="toggleSortMode()">排序</button>
+        <div class="group-title">监控节点列表</div>
+        <button class="node-sort-btn" id="sort-toggle-btn" type="button" onclick="toggleSortMode()">节点管理</button>
       </div>
       <div id="nodes-container">
         <div class="ios-card" style="padding: 24px; text-align: center; color: var(--text-muted); font-size: 14px;">正在加载节点...</div>
@@ -753,7 +825,7 @@ function buildNodeStructure(nodes, isRunning) {
           </button>
           <div class="node-top-row">
             <div class="node-identity">
-              <span class="node-name" title="${escapeHtml(n.name || '未命名')}">${escapeHtml(n.name || '未命名')}</span>
+              <span class="node-name" title="${escapeHtml(n.name || '未命名')}"><i class="node-status-dot badge-checking node-status"></i>${escapeHtml(n.name || '未命名')}</span>
               <div class="node-sub-info">
                 <div class="node-ip-wrap">
                   <span class="ip-type-badge ${getIPType(n.ip) === 'IPv6' ? 'ip-type-v6' : 'ip-type-v4'}">${getIPType(n.ip)}</span>
@@ -763,10 +835,7 @@ function buildNodeStructure(nodes, isRunning) {
                 <span class="node-location" data-ip="${escapeHtml(n.ip)}" onclick="toggleLocation(this)">查询归属地...</span>
               </div>
             </div>
-            <div class="node-status-wrapper">
-              <span class="badge-status-pill badge-checking node-status"><i class="dot"></i>${isRunning ? '检测中' : '等待检测'}</span>
-              <span class="delay-text node-delay">-</span>
-            </div>
+            <div class="node-status-wrapper"><span class="delay-text node-delay">-</span></div>
           </div>
           <div class="node-bottom-row">
             <div class="node-stats-group">
@@ -796,8 +865,7 @@ function updateNodeCard(card, item) {
     const failCount = parseInt(item.fail) || 0;
 
     if (statusEl) {
-        statusEl.className = "badge-status-pill node-status " + badgeCls;
-        statusEl.innerHTML = '<i class="dot"></i>' + escapeHtml(status);
+        statusEl.className = "node-status-dot node-status " + badgeCls;
     }
     if (delayEl) {
         delayEl.className = "delay-text node-delay " + delayCls;
@@ -1022,7 +1090,7 @@ function toggleSortMode() {
     sortMode = !sortMode;
     const btn = $("sort-toggle-btn");
     btn.classList.toggle("active", sortMode);
-    btn.innerText = sortMode ? "完成" : "排序";
+    btn.innerText = sortMode ? "完成" : "节点管理";
 
     const grid = document.querySelector(".node-cards-grid");
     if (grid) {
