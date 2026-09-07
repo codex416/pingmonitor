@@ -12,7 +12,7 @@
   html, body {
     margin: 0; padding: 0; width: 100%; min-height: 100%;
     background-color: var(--ios-bg) !important; color: var(--text-main);
-    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Segoe UI", Roboto, "PingFang SC", sans-serif;
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Segoe UI", "Helvetica Neue", Arial, "PingFang SC", "Hiragino Sans GB", sans-serif;
     -webkit-font-smoothing: antialiased; overscroll-behavior-y: none;
     overflow-x: hidden;
   }
@@ -31,7 +31,7 @@
   .large-title { font-size: 28px; font-weight: 800; letter-spacing: -0.6px; color: var(--text-main); line-height: 1.1; }
   .header-sub-row { display: flex; align-items: center; gap: 8px; margin-top: 0; flex-shrink: 0; }
   .status-dot { width: 8px; height: 8px; border-radius: 50%; background-color: var(--ios-green); display: inline-block; flex-shrink: 0; transition: background-color 0.3s ease; }
-  .last-update-text { font-size: 12px; color: var(--text-muted); font-weight: 400; }
+  .last-update-text { font-size: 12px; color: var(--text-muted); font-weight: 400; font-variant-numeric: tabular-nums; }
   .desktop-control-btn { display: none; }
   
   .group-title { font-size: 13px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: -0.1px; margin: 16px 2px 8px; }
@@ -42,7 +42,7 @@
   
   .widget-card { background: var(--card-bg); border-radius: var(--card-radius); padding: 16px 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.03); display: flex; flex-direction: column; justify-content: space-between; height: 90px; }
   .widget-lbl { font-size: 13px; color: var(--text-muted); font-weight: 500; }
-  .widget-val { font-size: 28px; font-weight: 700; letter-spacing: -0.8px; line-height: 1; }
+  .widget-val { font-size: 28px; font-weight: 700; letter-spacing: -0.8px; line-height: 1; font-variant-numeric: tabular-nums; }
   .ios-card { background: var(--card-bg); border-radius: var(--card-radius); overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.03); }
   #nodes-container { overflow: hidden; max-height: none; width: 100%; }
 
@@ -83,6 +83,7 @@
   }
   .node-name {
     font-size: 16px;
+    font-family: inherit;
     font-weight: 700;
     line-height: 1.25;
     color: var(--text-main);
@@ -108,7 +109,8 @@
   .ip-type-v4 { color: #007aff; background: rgba(0,122,255,0.10); }
   .ip-type-v6 { color: #5856d6; background: rgba(88,86,214,0.10); }
   .node-ip {
-    font-family: SFMono-Regular, Monaco, Consolas, monospace;
+    font-family: inherit;
+    font-variant-numeric: tabular-nums;
     font-weight: 500;
     color: #636366;
     cursor: pointer;
@@ -146,6 +148,7 @@
 
   .node-location {
     font-size: 12px;
+    font-family: inherit;
     color: #8e8e93;
     display: block;
     width: 100%;
@@ -194,8 +197,9 @@
   .delay-text {
     font-size: 14px;
     font-weight: 700;
-    font-family: SFMono-Regular, Monaco, Consolas, monospace;
-    letter-spacing: -0.3px;
+    font-family: inherit;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.2px;
   }
   .delay-good { color: #30d158; }
   .delay-medium { color: var(--ios-orange); }
@@ -217,7 +221,7 @@
     color: var(--text-muted);
     flex-wrap: wrap;
   }
-  .stat-val { font-weight: 600; color: #3a3a3c; }
+  .stat-val { font-weight: 600; color: #3a3a3c; font-variant-numeric: tabular-nums; }
   .fail-tag {
     color: var(--ios-red);
     background: rgba(255,59,48,0.08);
@@ -250,6 +254,7 @@
   }
   .action-btn-sm {
     height: 28px;
+    font-family: inherit;
     padding: 0 10px;
     font-size: 12px;
     font-weight: 600;
@@ -266,7 +271,7 @@
 
   .node-list-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
   .node-list-header .group-title { margin-right: 0; }
-  .node-sort-btn { height: 30px; padding: 0 14px; border: none; border-radius: 8px; background: #e5e5ea; color: var(--ios-blue); font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.2s; flex-shrink: 0; }
+  .node-sort-btn { height: 30px; padding: 0 14px; border: none; border-radius: 8px; background: #e5e5ea; color: var(--ios-blue); font-size: 12px; font-family: inherit; font-weight: 600; cursor: pointer; transition: all 0.2s; flex-shrink: 0; }
   .node-sort-btn.active { background: var(--ios-blue); color: #fff; }
   
   .node-sort-handle {
@@ -309,16 +314,16 @@
   }
 
   .input-group { padding: 16px; display: flex; flex-direction: column; gap: 12px; }
-  .ios-input { width: 100%; height: 40px; background: #f2f2f7; border: none; border-radius: 8px; padding: 0 12px; font-size: 14px; color: var(--text-main); outline: none; }
+  .ios-input { width: 100%; height: 40px; background: #f2f2f7; border: none; border-radius: 8px; padding: 0 12px; font-size: 14px; font-family: inherit; color: var(--text-main); outline: none; }
   .ios-input:focus { background: #e5e5ea; }
-  .ios-btn { height: 40px; border-radius: 8px; border: none; background: var(--ios-blue); color: #ffffff; font-size: 14px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+  .ios-btn { height: 40px; border-radius: 8px; border: none; background: var(--ios-blue); color: #ffffff; font-size: 14px; font-family: inherit; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; }
   .ios-btn-secondary { background: #e5e5ea; color: var(--ios-blue); }
   .ios-btn-danger { background: rgba(255,59,48,0.12); color: var(--ios-red); }
   
   .terminal-card { background: #1c1c1e; border-radius: var(--card-radius); padding: 14px 18px; display: flex; flex-direction: column; box-shadow: 0 2px 8px rgba(0,0,0,0.03); height: 260px; flex-shrink: 0; }
   .terminal-header { display: flex; align-items: center; justify-content: space-between; padding-bottom: 8px; margin-bottom: 8px; border-bottom: 0.5px solid rgba(255,255,255,0.12); flex-shrink: 0; }
   .terminal-title { font-size: 11px; color: #8e8e93; font-weight: 600; letter-spacing: 0.5px; font-family: SFMono-Regular, Consolas, Monaco, monospace; }
-  .terminal-clear-btn { background: rgba(255,59,48,0.2); color: #ff453a; border: none; border-radius: 6px; padding: 3px 10px; font-size: 11px; font-weight: 600; cursor: pointer; }
+  .terminal-clear-btn { background: rgba(255,59,48,0.2); color: #ff453a; border: none; border-radius: 6px; padding: 3px 10px; font-size: 11px; font-family: inherit; font-weight: 600; cursor: pointer; }
   .terminal-body { flex: 1; overflow-y: auto; color: #34c759; font-family: SFMono-Regular, Consolas, Monaco, monospace; font-size: 12px; line-height: 1.6; word-break: break-all; }
   
   @media (max-width: 991px) {
@@ -388,14 +393,14 @@
   .edit-modal-field { margin-bottom: 12px; }
   .edit-modal-field label { display: block; font-size: 12px; color: var(--text-muted); font-weight: 600; margin-bottom: 6px; }
   .edit-modal-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 16px; }
-  .edit-modal-actions button { height: 40px; border: none; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; }
+  .edit-modal-actions button { height: 40px; border: none; border-radius: 8px; font-size: 14px; font-family: inherit; font-weight: 600; cursor: pointer; }
   .edit-cancel-btn { background: #e5e5ea; color: var(--text-main); }
   .edit-save-btn { background: var(--ios-blue); color: #fff; }
   #toast {
     position: fixed; top: calc(env(safe-area-inset-top) + 20px); left: 50%;
     transform: translateX(-50%) translateY(-60px); background: rgba(0,0,0,0.85);
     backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); color: #fff;
-    padding: 10px 24px; border-radius: 25px; font-size: 14px; font-weight: 500;
+    padding: 10px 24px; border-radius: 25px; font-size: 14px; font-family: inherit; font-weight: 500;
     opacity: 0; transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1); z-index: 2000; pointer-events: none;
   }
   #toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
@@ -440,11 +445,12 @@
 
 
 /* ===== 节点卡片密度与顶部标题最终优化 ===== */
-.node-card { padding: 19px 22px; gap: 15px; }
+.node-card { padding: 19px 22px 12px; gap: 15px; }
 .node-identity { gap: 5px; }
 .node-sub-info { gap: 5px; }
-.node-bottom-row { padding-top: 7px; }
-.node-stats-group { gap: 6px; font-size: 11px; }
+.node-bottom-row { padding-top: 12px; padding-bottom: 0; }
+.node-stats-group { gap: 6px; font-size: 12px; line-height: 1.4; }
+.node-stats-group > span { line-height: 1.4; }
 .node-action-group { gap: 7px; }
 
 /* 顶部标题与更新时间同一行，PC 为控制按钮预留空间 */
@@ -463,8 +469,8 @@
   .desktop-control-btn { top: 22px; }
 }
 @media (max-width: 991px) {
-  .node-card { padding: 18px 18px; gap: 14px; }
-  .node-bottom-row { padding-top: 7px; }
+  .node-card { padding: 18px 18px 11px; gap: 14px; }
+  .node-bottom-row { padding-top: 11px; padding-bottom: 0; }
 }
 
 
@@ -515,7 +521,7 @@
 
 /* ===== 节点 IP 与在线状态优化 ===== */
 .node-ip {
-  font-family: "DengXian", "等线", sans-serif !important;
+  font-family: inherit !important;
   color: #000 !important;
   text-shadow: none !important;
   box-shadow: none !important;
@@ -543,7 +549,8 @@
   .node-ip,
   .node-ip .node-ip-link,
   .node-ip-link {
-    font-family: "DengXian", "等线", sans-serif !important;
+    font-family: inherit !important;
+    font-variant-numeric: tabular-nums;
     font-size: inherit !important;
     font-weight: 600 !important;
     color: #000 !important;
@@ -552,6 +559,18 @@
     opacity: 1 !important;
   }
 }
+
+
+  /* ===== Apple / iOS system typography ===== */
+  button, input, textarea, select {
+    font-family: inherit;
+  }
+  input::placeholder, textarea::placeholder {
+    font-family: inherit;
+  }
+  .widget-val, .delay-text, .stat-val, .last-update-text, .node-ip, #service-uptime {
+    font-variant-numeric: tabular-nums;
+  }
 
 </style>
 <link rel="icon" type="image/webp" sizes="32x32" href="https://free.boltp.com/2026/08/06/6a744b5ca9f18.webp">
@@ -639,7 +658,7 @@
               <div style="padding: 16px; display: flex; align-items: center; justify-content: space-between;">
                 <div>
                   <div style="font-size: 14px; font-weight: 600;">后台运行状态</div>
-                  <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">运行时间: <span id="service-uptime" style="font-family: monospace; font-weight: 600;">--:--:--</span></div>
+                  <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">运行时间: <span id="service-uptime" style="font-weight: 600; font-variant-numeric: tabular-nums;">--:--:--</span></div>
                 </div>
                 <span class="badge-status-pill badge-online" id="service-status-badge"><i class="dot"></i>检测中</span>
               </div>
