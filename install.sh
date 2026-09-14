@@ -49,16 +49,21 @@ fi
 
 echo "设置运行目录和文件权限"
 
-# Git 仓库本身由 root 管理，www-data 只获得运行时所需权限。
+# Git 仓库文件由 root 管理；Web 服务以 www-data 运行。
 chown -R root:root "$APP_DIR"
 
-# 程序、模板、静态资源和 Git 元数据保持 root 管理。
+# 普通程序文件、模板、静态资源和 Git 元数据保持 root 管理。
 find "$APP_DIR" -type d -exec chmod 755 {} \;
 find "$APP_DIR" -type f -exec chmod 644 {} \;
 chmod +x "$APP_DIR/install.sh"
 
-# 运行时目录：monitor.py 以 root 运行，web.py 以 www-data 运行。
-# logs 使用 root:www-data + 组写权限，Web 端可以正常追加和清空日志。
+# web.py 和 monitor.py 都会使用“临时文件 + os.replace()”原子写入 JSON。
+# 因此 /opt/pingmonitor 本身必须允许 www-data 创建/替换运行时 JSON 临时文件。
+# 文件本身仍保持 root:www-data，代码文件仍保持 root 管理。
+chown root:www-data "$APP_DIR"
+chmod 2775 "$APP_DIR"
+
+# 运行时日志目录：monitor.py 以 root 运行，web.py 以 www-data 运行。
 mkdir -p "$APP_DIR/logs"
 chown root:www-data "$APP_DIR/logs"
 chmod 2775 "$APP_DIR/logs"
@@ -96,6 +101,9 @@ install -o root -g root -m 440 \
 
 # 检查 sudoers 语法，避免错误配置导致 sudo 异常。
 visudo -cf /etc/sudoers.d/pingmonitor
+
+echo "验证 www-data 的运行目录写权限"
+sudo -u www-data sh -c 'tmp="/opt/pingmonitor/.pingmonitor-permission-test.tmp"; printf "%s" "ok" > "$tmp" && rm -f "$tmp"'
 
 echo "启动服务"
 systemctl daemon-reload
