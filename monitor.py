@@ -8,6 +8,7 @@ import threading
 import requests
 import os
 import re
+import socket
 from datetime import datetime
 
 BASE_DIR = "/opt/pingmonitor"
@@ -99,24 +100,19 @@ class Monitor:
         except Exception:
             pass
 
-    def ping(self, ip):
+    def ping(self, ip, port=22):
+        """TCP Ping：默认检测 TCP 22 端口，返回连接建立耗时。"""
         try:
-            result = subprocess.run(
-                ["ping", "-c", "1", "-W", "3", ip],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.DEVNULL,
-                text=True
-            )
-
-            if result.returncode != 0:
+            port = int(port or 22)
+            if port < 1 or port > 65535:
                 return False, "-"
 
-            m = re.search(r'time[=<]?\s*([\d.]+)', result.stdout)
-            if m:
-                return True, m.group(1) + "ms"
+            start = time.perf_counter()
+            with socket.create_connection((ip, port), timeout=3):
+                delay_ms = (time.perf_counter() - start) * 1000
 
-            return True, "-"
-        except Exception:
+            return True, f"{delay_ms:.1f}ms"
+        except (socket.timeout, ConnectionRefusedError, OSError, ValueError):
             return False, "-"
 
     def notify(self, node, worker):
@@ -141,6 +137,7 @@ class Monitor:
     def check_node(self, node):
         ip = node["ip"]
         name = node["name"]
+        port = int(node.get("port", 22) or 22)
 
         while True:
             cfg = self.load_config()
@@ -159,43 +156,44 @@ class Monitor:
             # 名称修改后立即采用最新名称，IP 不变时监控线程继续复用。
             node = current_node
             name = node.get("name", ip)
+            port = int(node.get("port", 22) or 22)
 
             interval = cfg.get("interval", 60)
             worker = cfg.get("worker", "")
 
-            ok, delay = self.ping(ip)
+            ok, delay = self.ping(ip, port)
 
             if ok:
                 self.update_status(node, "在线", delay, 0)
-                self.log(f"{name} 在线 {delay}")
+                self.log(f"{name} TCP:{port} 在线 {delay}")
                 time.sleep(interval)
                 continue
 
             self.update_status(node, "离线", "-", 1)
-            self.log(f"{name} 第一次失败")
+            self.log(f"{name} TCP:{port} 第一次失败")
             time.sleep(3)
 
-            ok, _ = self.ping(ip)
+            ok, _ = self.ping(ip, port)
             if ok:
                 continue
 
-            self.log(f"{name} 第二次失败")
+            self.log(f"{name} TCP:{port} 第二次失败")
             time.sleep(5)
 
             ok, _ = self.ping(ip)
             if ok:
                 continue
 
-            self.log(f"{name} 第三次失败确认")
+            self.log(f"{name} TCP:{port} 第三次失败确认")
             time.sleep(2)
 
-            a, _ = self.ping(ip)
+            a, _ = self.ping(ip, port)
             time.sleep(1)
-            b, _ = self.ping(ip)
+            b, _ = self.ping(ip, port)
 
             if not a and not b:
                 self.update_status(node, "离线", "-", 3)
-                self.log(f"{name} 故障停止检测")
+                self.log(f"{name} TCP:{port} 故障停止检测")
                 self.notify(node, worker)
 
                 # 标记停止，不删除
