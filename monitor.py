@@ -115,6 +115,23 @@ class Monitor:
         except (socket.timeout, ConnectionRefusedError, OSError, ValueError):
             return False, "-"
 
+    def wait_for_target_change(self, ip, target_signature, seconds):
+        """等待检测周期；如果检测目标(IP/域名或TCP端口)发生变化则立即返回。"""
+        deadline = time.time() + max(0, float(seconds))
+        while time.time() < deadline:
+            cfg = self.load_config()
+            current_node = next((n for n in cfg.get("nodes", []) if n.get("ip") == ip), None)
+            if not current_node:
+                return True
+
+            current_port = int(current_node.get("port", 22) or 22)
+            current_signature = (current_node.get("ip", ""), current_port)
+            if current_signature != target_signature:
+                return True
+
+            time.sleep(min(1, max(0, deadline - time.time())))
+        return False
+
     def notify(self, node, worker):
         if not worker:
             return
@@ -142,7 +159,7 @@ class Monitor:
         while True:
             cfg = self.load_config()
 
-            # 每轮读取最新节点信息，支持网页端直接修改节点名称。
+            # 每轮读取最新节点信息。
             current_node = next((n for n in cfg.get("nodes", []) if n.get("ip") == ip), None)
 
             # 节点已被删除或 IP 已被修改：结束旧 IP 的监控线程。
@@ -153,10 +170,10 @@ class Monitor:
                     del self.running_nodes[ip]
                 break
 
-            # 名称修改后立即采用最新名称，IP 不变时监控线程继续复用。
             node = current_node
             name = node.get("name", ip)
             port = int(node.get("port", 22) or 22)
+            target_signature = (ip, port)
 
             interval = cfg.get("interval", 60)
             worker = cfg.get("worker", "")
@@ -166,29 +183,42 @@ class Monitor:
             if ok:
                 self.update_status(node, "在线", delay, 0)
                 self.log(f"{name} TCP:{port} 在线 {delay}")
-                time.sleep(interval)
+                # 名称、Worker、检测间隔等普通配置不会打断周期；IP/端口变化会立即打断等待。
+                if self.wait_for_target_change(ip, target_signature, interval):
+                    current_cfg = self.load_config()
+                    current = next((n for n in current_cfg.get("nodes", []) if n.get("ip") == ip), None)
+                    if current:
+                        new_port = int(current.get("port", 22) or 22)
+                        if (ip, new_port) != target_signature:
+                            self.update_status(current, "检测中", "-", 0)
+                            self.log(f"{name} 检测目标已变化，立即重新检测 TCP:{new_port}")
+                    continue
                 continue
 
             self.update_status(node, "离线", "-", 1)
             self.log(f"{name} TCP:{port} 第一次失败")
-            time.sleep(3)
+            if self.wait_for_target_change(ip, target_signature, 3):
+                continue
 
             ok, _ = self.ping(ip, port)
             if ok:
                 continue
 
             self.log(f"{name} TCP:{port} 第二次失败")
-            time.sleep(5)
+            if self.wait_for_target_change(ip, target_signature, 5):
+                continue
 
             ok, _ = self.ping(ip, port)
             if ok:
                 continue
 
             self.log(f"{name} TCP:{port} 第三次失败确认")
-            time.sleep(2)
+            if self.wait_for_target_change(ip, target_signature, 2):
+                continue
 
             a, _ = self.ping(ip, port)
-            time.sleep(1)
+            if self.wait_for_target_change(ip, target_signature, 1):
+                continue
             b, _ = self.ping(ip, port)
 
             if not a and not b:
@@ -216,7 +246,7 @@ class Monitor:
                     ).start()
                     self.log(f"启动监控: {node['name']}")
 
-            time.sleep(10)
+            time.sleep(1)
 
     def start(self):
         self.log("PingMonitor启动")
