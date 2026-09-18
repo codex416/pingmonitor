@@ -129,7 +129,9 @@
   }
 
 
-  /* 归属地显示在对应 IP 下一行 */
+  /* ----------------------------------------------------
+     修改：归属地独立占满第二行、超过部分截断可点击展开
+  ---------------------------------------------------- */
 
   .node-ip-link {
     border: none; font: inherit; color: inherit; cursor: pointer; background: transparent; padding: 0;
@@ -714,7 +716,7 @@
 <style>
 .dual-ip-inputs{display:grid;grid-template-columns:1fr 1fr;gap:8px;width:100%}
 .node-ip-list{display:flex;flex-direction:column;gap:4px;width:100%}
-.node-address-line{display:flex;flex-direction:column;align-items:flex-start;gap:2px;width:100%;min-width:0;}
+.node-address-line{display:flex;align-items:center;gap:5px;min-width:0}
 .node-address-line .node-ip{min-width:0}
 @media(max-width:600px){.dual-ip-inputs{grid-template-columns:1fr}.node-address-line .node-ip{flex:1;min-width:0}}
 </style>
@@ -954,31 +956,30 @@ async function getIPLocation(ip) {
 
 async function refreshIPLocations(nodes) {
     for (const n of nodes) {
-        const ips = [n.ipv4, n.ipv6].filter(Boolean);
-        for (const ip of ips) {
-            const el = document.querySelector('.node-location[data-ip="' + cssEscape(ip) + '"]');
-            if (!el) continue;
+        const ip = n.ip;
+        const el = document.querySelector('.node-location[data-ip="' + cssEscape(ip) + '"]');
+        if (!el) continue;
 
-            if (ipLocationCache[ip]) {
-                el.innerText = ipLocationCache[ip];
-                el.title = ipLocationCache[ip];
-                continue;
-            }
-
-            if (locationLoading.has(ip)) continue;
-            locationLoading.add(ip);
-            el.innerText = getIPType(ip) + " 归属地查询...";
-
-            getIPLocation(ip).then(loc => {
-                const current = document.querySelector('.node-location[data-ip="' + cssEscape(ip) + '"]');
-                if (current) {
-                    current.innerText = loc;
-                    current.title = loc;
-                }
-            }).finally(() => locationLoading.delete(ip));
+        if (ipLocationCache[ip]) {
+            el.innerText = ipLocationCache[ip];
+            el.title = ipLocationCache[ip];
+            continue;
         }
+
+        if (locationLoading.has(ip)) continue;
+        locationLoading.add(ip);
+        el.innerText = "查询归属地...";
+
+        getIPLocation(ip).then(loc => {
+            const current = document.querySelector('.node-location[data-ip="' + cssEscape(ip) + '"]');
+            if (current) {
+                current.innerText = loc;
+                current.title = loc;
+            }
+        }).finally(() => locationLoading.delete(ip));
     }
 }
+
 function nodeStatusData(node, statusMap, isRunning) {
     if (!isRunning) return { name: node.name, ip: node.ip, status: "等待检测", delay: "-", last: "-", fail: 0, check: node.check || "ping", port: Number(node.port) || 443 };
     return statusMap[node.ip] ? { ...statusMap[node.ip] } : { name: node.name, ip: node.ip, status: "检测中", delay: "-", last: "-", fail: 0, check: node.check || "ping", port: Number(node.port) || 443 };
@@ -1003,8 +1004,8 @@ function buildNodeStructure(nodes, isRunning) {
     const html = nodes.map(n => {
         const addresses = [];
         const copySvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"></rect><path d="M15 9V7a2 2 0 0 0-2-2H7a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"></path></svg>';
-        if (n.ipv4) addresses.push(`<div class="node-address-line"><div class="node-address-main"><span class="ip-type-badge ip-type-v4">IPv4</span><span class="node-ip"><button class="node-ip-link" type="button" title="点击跳转 ITDOG 检测" onclick="openITDog('${escapeHtml(n.ipv4)}')">${escapeHtml(n.ipv4)}</button></span><button class="node-ip-copy" type="button" title="复制 IPv4" onclick="copyText('${escapeHtml(n.ipv4)}')">${copySvg}</button></div><span class="node-location" data-ip="${escapeHtml(n.ipv4)}" onclick="toggleLocation(this)">查询归属地...</span></div>`);
-        if (n.ipv6) addresses.push(`<div class="node-address-line"><div class="node-address-main"><span class="ip-type-badge ip-type-v6">IPv6</span><span class="node-ip"><button class="node-ip-link" type="button" title="点击跳转 ITDOG IPv6 检测" onclick="openITDog('${escapeHtml(n.ipv6)}')">${escapeHtml(n.ipv6)}</button></span><button class="node-ip-copy" type="button" title="复制 IPv6" onclick="copyText('${escapeHtml(n.ipv6)}')">${copySvg}</button></div><span class="node-location" data-ip="${escapeHtml(n.ipv6)}" onclick="toggleLocation(this)">查询归属地...</span></div>`);
+        if (n.ipv4) addresses.push(`<div class="node-address-line"><span class="ip-type-badge ip-type-v4">IPv4</span><span class="node-ip"><button class="node-ip-link" type="button" title="点击跳转 ITDOG 检测" onclick="openITDog('${escapeHtml(n.ipv4)}')">${escapeHtml(n.ipv4)}</button></span><button class="node-ip-copy" type="button" title="复制 IPv4" onclick="copyText('${escapeHtml(n.ipv4)}')">${copySvg}</button></div>`);
+        if (n.ipv6) addresses.push(`<div class="node-address-line"><span class="ip-type-badge ip-type-v6">IPv6</span><span class="node-ip"><button class="node-ip-link" type="button" title="点击跳转 ITDOG IPv6 检测" onclick="openITDog('${escapeHtml(n.ipv6)}')">${escapeHtml(n.ipv6)}</button></span><button class="node-ip-copy" type="button" title="复制 IPv6" onclick="copyText('${escapeHtml(n.ipv6)}')">${copySvg}</button></div>`);
         const domainLine = n.domain ? `<span class="node-domain" title="${escapeHtml(n.domain)}">域名：${escapeHtml(n.domain)}</span>` : '';
         return `
         <div class="node-card" data-ip="${escapeHtml(n.ip)}">
@@ -1015,7 +1016,8 @@ function buildNodeStructure(nodes, isRunning) {
               <div class="node-sub-info">
                 <div class="node-ip-list">${addresses.join('')}</div>
                 ${domainLine}
-                              </div>
+                <span class="node-location" data-ip="${escapeHtml(n.ip)}" onclick="toggleLocation(this)">查询归属地...</span>
+              </div>
             </div>
           </div>
           <div class="node-network-results">
