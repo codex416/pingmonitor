@@ -125,7 +125,8 @@ class Monitor:
                 return True
 
             current_port = int(current_node.get("port", 22) or 22)
-            current_signature = (current_node.get("ip", ""), current_port)
+            current_version = int(current_node.get("_target_version", 0) or 0)
+            current_signature = (current_node.get("ip", ""), current_port, current_version)
             if current_signature != target_signature:
                 return True
 
@@ -173,7 +174,8 @@ class Monitor:
             node = current_node
             name = node.get("name", ip)
             port = int(node.get("port", 22) or 22)
-            target_signature = (ip, port)
+            target_version = int(node.get("_target_version", 0) or 0)
+            target_signature = (ip, port, target_version)
 
             interval = cfg.get("interval", 60)
             worker = cfg.get("worker", "")
@@ -189,7 +191,8 @@ class Monitor:
                     current = next((n for n in current_cfg.get("nodes", []) if n.get("ip") == ip), None)
                     if current:
                         new_port = int(current.get("port", 22) or 22)
-                        if (ip, new_port) != target_signature:
+                        new_version = int(current.get("_target_version", 0) or 0)
+                        if (ip, new_port, new_version) != target_signature:
                             self.update_status(current, "检测中", "-", 0)
                             self.log(f"{name} 检测目标已变化，立即重新检测 TCP:{new_port}")
                     continue
