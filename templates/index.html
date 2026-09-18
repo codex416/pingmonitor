@@ -735,8 +735,9 @@
               <div class="input-group">
                 <input class="ios-input" id="name" placeholder="节点名称（例如: 香港服务器）">
                 <input class="ios-input" id="ip" placeholder="IP 地址或域名">
+                <input class="ios-input" id="port" type="number" min="1" max="65535" value="22" placeholder="TCP 端口（默认 22）">
                 <button class="ios-btn" onclick="addNode()">添加节点</button>
-              <input class="ios-input" id="port" type="number" min="1" max="65535" value="22" placeholder="TCP 端口（默认 22）"></div>
+              </div>
             </div>
           </div>
 
@@ -809,7 +810,10 @@
     <div class="edit-modal-field">
       <label for="edit-ip">IP 地址或域名</label>
       <input class="ios-input" id="edit-ip" autocomplete="off">
-    <input class="ios-input" id="edit-port" type="number" min="1" max="65535" autocomplete="off" placeholder="TCP 端口">
+    </div>
+    <div class="edit-modal-field">
+      <label for="edit-port">TCP 端口</label>
+      <input class="ios-input" id="edit-port" type="number" min="1" max="65535" autocomplete="off" placeholder="22">
     </div>
     <div class="edit-modal-actions">
       <button class="edit-cancel-btn" type="button" onclick="closeEditModal()">取消</button>
