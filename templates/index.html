@@ -956,30 +956,31 @@ async function getIPLocation(ip) {
 
 async function refreshIPLocations(nodes) {
     for (const n of nodes) {
-        const ip = n.ip;
-        const el = document.querySelector('.node-location[data-ip="' + cssEscape(ip) + '"]');
-        if (!el) continue;
+        const ips = [n.ipv4, n.ipv6].filter(Boolean);
+        for (const ip of ips) {
+            const el = document.querySelector('.node-location[data-ip="' + cssEscape(ip) + '"]');
+            if (!el) continue;
 
-        if (ipLocationCache[ip]) {
-            el.innerText = ipLocationCache[ip];
-            el.title = ipLocationCache[ip];
-            continue;
-        }
-
-        if (locationLoading.has(ip)) continue;
-        locationLoading.add(ip);
-        el.innerText = "查询归属地...";
-
-        getIPLocation(ip).then(loc => {
-            const current = document.querySelector('.node-location[data-ip="' + cssEscape(ip) + '"]');
-            if (current) {
-                current.innerText = loc;
-                current.title = loc;
+            if (ipLocationCache[ip]) {
+                el.innerText = ipLocationCache[ip];
+                el.title = ipLocationCache[ip];
+                continue;
             }
-        }).finally(() => locationLoading.delete(ip));
+
+            if (locationLoading.has(ip)) continue;
+            locationLoading.add(ip);
+            el.innerText = getIPType(ip) + " 归属地查询...";
+
+            getIPLocation(ip).then(loc => {
+                const current = document.querySelector('.node-location[data-ip="' + cssEscape(ip) + '"]');
+                if (current) {
+                    current.innerText = loc;
+                    current.title = loc;
+                }
+            }).finally(() => locationLoading.delete(ip));
+        }
     }
 }
-
 function nodeStatusData(node, statusMap, isRunning) {
     if (!isRunning) return { name: node.name, ip: node.ip, status: "等待检测", delay: "-", last: "-", fail: 0, check: node.check || "ping", port: Number(node.port) || 443 };
     return statusMap[node.ip] ? { ...statusMap[node.ip] } : { name: node.name, ip: node.ip, status: "检测中", delay: "-", last: "-", fail: 0, check: node.check || "ping", port: Number(node.port) || 443 };
@@ -1016,7 +1017,8 @@ function buildNodeStructure(nodes, isRunning) {
               <div class="node-sub-info">
                 <div class="node-ip-list">${addresses.join('')}</div>
                 ${domainLine}
-                <span class="node-location" data-ip="${escapeHtml(n.ip)}" onclick="toggleLocation(this)">查询归属地...</span>
+                ${n.ipv4 ? `<span class="node-location" data-ip="${escapeHtml(n.ipv4)}" onclick="toggleLocation(this)">IPv4 归属地查询...</span>` : ''}
+                ${n.ipv6 ? `<span class="node-location" data-ip="${escapeHtml(n.ipv6)}" onclick="toggleLocation(this)">IPv6 归属地查询...</span>` : ''}
               </div>
             </div>
           </div>
