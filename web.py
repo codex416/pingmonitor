@@ -267,7 +267,15 @@ def add_node():
                 write_log(f"添加节点失败: 节点 [{ip}] 已存在")
                 return jsonify({"ok": False, "msg": "节点已存在"})
 
-        cfg.setdefault("nodes", []).append({"name": name, "ip": ip})
+        port = data.get("port", 22)
+        try:
+            port = int(port)
+        except (TypeError, ValueError):
+            return jsonify({"ok": False, "msg": "端口必须是 1-65535"})
+        if port < 1 or port > 65535:
+            return jsonify({"ok": False, "msg": "端口必须是 1-65535"})
+
+        cfg.setdefault("nodes", []).append({"name": name, "ip": ip, "port": port})
         save_json_atomic(CONFIG_FILE, cfg)
 
         write_log(f"添加节点成功: 名称=[{name}], IP/域名=[{ip}]")
@@ -322,6 +330,13 @@ def edit_node():
         old_ip = str(data.get("old_ip", "")).strip()
         new_ip = str(data.get("ip", "")).strip()
         new_name = str(data.get("name", "")).strip() or new_ip
+        port = data.get("port", 22)
+        try:
+            port = int(port)
+        except (TypeError, ValueError):
+            return jsonify({"ok": False, "msg": "端口必须是 1-65535"})
+        if port < 1 or port > 65535:
+            return jsonify({"ok": False, "msg": "端口必须是 1-65535"})
 
         if not old_ip or not new_ip:
             write_log("编辑节点失败: IP或域名不能为空")
@@ -341,6 +356,7 @@ def edit_node():
 
         target["name"] = new_name
         target["ip"] = new_ip
+        target["port"] = port
         save_json_atomic(CONFIG_FILE, cfg)
 
         # IP 改变后清理旧状态，避免旧 IP 残留在面板。
@@ -362,6 +378,7 @@ def edit_node():
                 if new_ip in status:
                     status[new_ip]["name"] = new_name
                     status[new_ip]["ip"] = new_ip
+                    status[new_ip]["port"] = port
                     save_json_atomic(STATUS_FILE, status)
             except Exception as e:
                 print(f"[Warning] 编辑节点同步状态失败: {e}")
