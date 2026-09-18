@@ -744,7 +744,10 @@
             <div class="ios-card">
               <div class="input-group">
                 <input class="ios-input" id="name" placeholder="节点名称（例如: 香港服务器）">
-                <input class="ios-input" id="ip" placeholder="IP 地址或域名">
+                <div class="dual-ip-inputs">
+                  <input class="ios-input" id="ipv4" placeholder="IPv4 地址（可选）" inputmode="numeric" autocomplete="off">
+                  <input class="ios-input" id="ipv6" placeholder="IPv6 地址（可选）" inputmode="text" autocomplete="off">
+                </div>
                 <div class="node-check-config">
                   <div class="node-check-option"><label>检测方式</label><select class="ios-input" id="check">
                     <option value="both" selected>ICMP + TCPing</option><option value="ping">仅 ICMP</option><option value="tcp">仅 TCPing</option>
@@ -987,8 +990,8 @@ function buildNodeStructure(nodes, isRunning) {
                 <span class="node-location" data-ip="${escapeHtml(n.ip)}" onclick="toggleLocation(this)">查询归属地...</span>
                 <div class="node-check-summary"><span class="node-check-mode">${n.check === 'tcp' ? 'TCPing' : (n.check === 'both' ? 'ICMP + TCPing' : 'ICMP')}</span><span class="node-check-port">${n.check === 'ping' ? '' : 'TCP:' + (Number(n.port) || 443)}</span></div>
                 <div class="node-network-results">
-                  ${n.ipv4 ? '<div class="network-result-row" data-family-row="ipv4"><span class="network-family">IPv4</span><span class="network-address" data-role="ipv4-address">未检测</span><span class="network-metric" data-role="ipv4-metric">--</span></div>' : ''}
-                  ${n.ipv6 ? '<div class="network-result-row" data-family-row="ipv6"><span class="network-family network-family-v6">IPv6</span><span class="network-address" data-role="ipv6-address">未检测</span><span class="network-metric" data-role="ipv6-metric">--</span></div>' : ''}
+                  ${n.ipv4 ? '<div class="network-result-row" data-family-row="ipv4"><span class="network-family">IPv4</span><span class="network-metric" data-role="ipv4-metric">--</span></div>' : ''}
+                  ${n.ipv6 ? '<div class="network-result-row" data-family-row="ipv6"><span class="network-family network-family-v6">IPv6</span><span class="network-metric" data-role="ipv6-metric">--</span></div>' : ''}
                 </div>
               </div>
             </div>
@@ -1010,10 +1013,9 @@ function buildNodeStructure(nodes, isRunning) {
 }
 
 function updateNetworkRow(card, role, family, check, port) {
-    const a=card.querySelector(`[data-role="${role}-address"]`), m=card.querySelector(`[data-role="${role}-metric"]`);
-    if (!a || !m) return;
-    if (!family || !family.available) { a.innerText="未发现"; m.innerText="—"; m.className="network-metric network-unavailable"; return; }
-    a.innerText=family.address || "—";
+    const m=card.querySelector(`[data-role="${role}-metric"]`);
+    if (!m) return;
+    if (!family || !family.available) { m.innerText="未发现"; m.className="network-metric network-unavailable"; return; }
     const ic=family.icmp||{}, tcp=family.tcp||{}, parts=[];
     if (check==="ping"||check==="both") parts.push(ic.status==="online" ? `ICMP ${ic.delay ?? "-"}ms` : "ICMP 失败");
     if (check==="tcp"||check==="both") parts.push(tcp.status==="online" ? `TCP:${port} ${tcp.delay ?? "-"}ms` : `TCP:${port} 失败`);
