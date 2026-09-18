@@ -965,7 +965,7 @@ function buildNodeStructure(nodes, isRunning) {
                 <span class="node-location" data-ip="${escapeHtml(n.ip)}" onclick="toggleLocation(this)">查询归属地...</span>
               </div>
             </div>
-            <div class="node-status-wrapper"><span class="delay-text node-delay">-</span><span class="node-tcp-delay">TCP 443: -</span></div>
+            <div class="node-status-wrapper"><span class="delay-text node-delay">-</span><span class="node-tcp-delay">TCP 22: -</span></div>
           </div>
           <div class="node-bottom-row">
             <div class="node-stats-group">
@@ -1003,7 +1003,7 @@ function updateNodeCard(card, item) {
         delayEl.innerText = String(item.delay ?? "-");
     }
     if (lastEl) lastEl.innerText = String(item.last ?? "-");
-    if (tcpEl) tcpEl.innerText = "TCP " + String(item.tcp_port ?? 443) + ": " + String(item.tcp_delay ?? "-");
+    if (tcpEl) tcpEl.innerText = "TCP " + String(item.tcp_port ?? 22) + ": " + String(item.tcp_delay ?? "-");
     if (failEl) {
         failEl.hidden = failCount <= 0;
         failEl.innerText = failCount > 0 ? `连续失败: ${failCount}次` : "";
