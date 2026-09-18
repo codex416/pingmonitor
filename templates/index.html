@@ -955,8 +955,16 @@ function openTCPPing(ip, port) {
     const tcpPort = parseInt(port, 10) || 22;
     if (!value) return;
 
-    const url = 'https://www.itdog.cn/tcping/' + encodeURIComponent(value) + ':' + tcpPort;
-    window.open(url, '_blank', 'noopener');
+    const isIPv6 = value.includes(':');
+    const target = isIPv6
+        ? '[' + value + ']:' + tcpPort
+        : value + ':' + tcpPort;
+
+    const base = isIPv6
+        ? 'https://www.itdog.cn/tcping_ipv6/'
+        : 'https://www.itdog.cn/tcping/';
+
+    window.open(base + target, '_blank', 'noopener');
 }
 
 function buildNodeStructure(nodes, isRunning) {
