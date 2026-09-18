@@ -1063,7 +1063,8 @@ function updateNodeCard(card, item) {
     const statusTextEl = card.querySelector('.node-status-text');
     const lastEl = card.querySelector('.node-last');
     const failEl = card.querySelector('.node-fail');
-    const status = item.status || "检测中";
+    const rawStatus = String(item.status || "checking").toLowerCase();
+    const status = rawStatus === "online" || rawStatus === "在线" ? "在线" : (rawStatus === "offline" || rawStatus === "离线" ? "离线" : "检测中");
     const check = item.check || "ping";
     const port = Number(item.port) || 443;
     const failCount = parseInt(item.fail) || 0;
@@ -1109,8 +1110,9 @@ function updateNodeCards(nodes, status, isRunning) {
 
     nodes.forEach(n => {
         const item = nodeStatusData(n, statusMap, isRunning);
-        if (item.status === "在线") totalOnline++;
-        if (item.status === "离线") totalOffline++;
+        const normalizedStatus = String(item.status || "").toLowerCase();
+        if (normalizedStatus === "online" || normalizedStatus === "在线") totalOnline++;
+        if (normalizedStatus === "offline" || normalizedStatus === "离线") totalOffline++;
         const numDelay = parseInt(item.delay);
         if (!isNaN(numDelay)) { totalDelay += numDelay; delayCount++; }
         const card = document.querySelector('.node-card[data-ip="' + cssEscape(n.ip) + '"]');
