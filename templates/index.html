@@ -965,7 +965,7 @@ function buildNodeStructure(nodes, isRunning) {
                 <span class="node-location" data-ip="${escapeHtml(n.ip)}" onclick="toggleLocation(this)">查询归属地...</span>
               </div>
             </div>
-            <div class="node-status-wrapper"><span class="delay-text node-delay">-</span></div>
+            <div class="node-status-wrapper"><span class="delay-text node-delay">-</span><span class="node-tcp-delay">TCP 443: -</span></div>
           </div>
           <div class="node-bottom-row">
             <div class="node-stats-group">
@@ -987,6 +987,7 @@ function updateNodeCard(card, item) {
     const statusEl = card.querySelector('.node-status');
     const delayEl = card.querySelector('.node-delay');
     const lastEl = card.querySelector('.node-last');
+    const tcpEl = card.querySelector('.node-tcp-delay');
     const failEl = card.querySelector('.node-fail');
     const status = item.status || "检测中";
     const numDelay = parseInt(item.delay);
@@ -1002,6 +1003,7 @@ function updateNodeCard(card, item) {
         delayEl.innerText = String(item.delay ?? "-");
     }
     if (lastEl) lastEl.innerText = String(item.last ?? "-");
+    if (tcpEl) tcpEl.innerText = "TCP " + String(item.tcp_port ?? 443) + ": " + String(item.tcp_delay ?? "-");
     if (failEl) {
         failEl.hidden = failCount <= 0;
         failEl.innerText = failCount > 0 ? `连续失败: ${failCount}次` : "";
