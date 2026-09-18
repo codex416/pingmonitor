@@ -130,7 +130,7 @@ class Monitor:
             if current_signature != target_signature:
                 return True
 
-            time.sleep(min(1, max(0, deadline - time.time())))
+            time.sleep(min(0.1, max(0, deadline - time.time())))
         return False
 
     def notify(self, node, worker):
@@ -249,7 +249,7 @@ class Monitor:
                     ).start()
                     self.log(f"启动监控: {node['name']}")
 
-            time.sleep(1)
+            time.sleep(0.2)
 
     def start(self):
         self.log("PingMonitor启动")
