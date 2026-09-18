@@ -268,7 +268,7 @@ def add_node():
                 return jsonify({"ok": False, "msg": "节点已存在"})
 
         try:
-            port = int(data.get("port", 443))
+            port = int(data.get("port", 22))
         except (TypeError, ValueError):
             port = 443
         if port < 1 or port > 65535:
@@ -346,7 +346,7 @@ def edit_node():
             return jsonify({"ok": False, "msg": "新 IP/域名已存在"})
 
         try:
-            port = int(data.get("port", target.get("port", 443)))
+            port = int(data.get("port", target.get("port", 22)))
         except (TypeError, ValueError):
             port = 443
         if port < 1 or port > 65535:
