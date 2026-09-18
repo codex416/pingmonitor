@@ -381,7 +381,8 @@ def edit_node():
             except Exception as e:
                 print(f"[Warning] 编辑节点清理旧状态失败: {e}")
 
-        # 仅修改名称时，同步现有状态中的名称。
+        # 同 IP 编辑：名称直接同步；如果 IP/端口发生变化，立即把界面状态切换为“检测中”。
+        # 这样用户点击保存后无需等待 monitor.py 下一轮检测才看到状态变化。
         if old_ip == new_ip and os.path.exists(STATUS_FILE):
             try:
                 with open(STATUS_FILE, "r", encoding="utf-8") as f:
@@ -390,6 +391,11 @@ def edit_node():
                     status[new_ip]["name"] = new_name
                     status[new_ip]["ip"] = new_ip
                     status[new_ip]["port"] = port
+                    if target_changed:
+                        status[new_ip]["status"] = "检测中"
+                        status[new_ip]["delay"] = "-"
+                        status[new_ip]["fail"] = 0
+                        status[new_ip]["last"] = time.strftime("%Y-%m-%d %H:%M:%S")
                     save_json_atomic(STATUS_FILE, status)
             except Exception as e:
                 print(f"[Warning] 编辑节点同步状态失败: {e}")
