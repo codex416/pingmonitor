@@ -1005,8 +1005,8 @@ function buildNodeStructure(nodes, isRunning) {
     const html = nodes.map(n => {
         const addresses = [];
         const copySvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"></rect><path d="M15 9V7a2 2 0 0 0-2-2H7a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"></path></svg>';
-        if (n.ipv4) addresses.push(`<div class="node-address-line"><span class="ip-type-badge ip-type-v4">IPv4</span><span class="node-ip"><button class="node-ip-link" type="button" title="点击跳转 ITDOG 检测" onclick="openITDog('${escapeHtml(n.ipv4)}')">${escapeHtml(n.ipv4)}</button></span><button class="node-ip-copy" type="button" title="复制 IPv4" onclick="copyText('${escapeHtml(n.ipv4)}')">${copySvg}</button></div>`);
-        if (n.ipv6) addresses.push(`<div class="node-address-line"><span class="ip-type-badge ip-type-v6">IPv6</span><span class="node-ip"><button class="node-ip-link" type="button" title="点击跳转 ITDOG IPv6 检测" onclick="openITDog('${escapeHtml(n.ipv6)}')">${escapeHtml(n.ipv6)}</button></span><button class="node-ip-copy" type="button" title="复制 IPv6" onclick="copyText('${escapeHtml(n.ipv6)}')">${copySvg}</button></div>`);
+        if (n.ipv4) addresses.push(`<div class="node-address-line"><span class="ip-type-badge ip-type-v4">IPv4</span><span class="node-ip"><button class="node-ip-link" type="button" title="点击跳转 ITDOG 检测" onclick="openITDog('${escapeHtml(n.ipv4)}')">${escapeHtml(n.ipv4)}</button></span><button class="node-ip-copy" type="button" title="复制 IPv4" onclick="copyText('${escapeHtml(n.ipv4)}')">${copySvg}</button><span class="node-location" data-ip="${escapeHtml(n.ipv4)}" onclick="toggleLocation(this)">查询归属地...</span></div>`);
+        if (n.ipv6) addresses.push(`<div class="node-address-line"><span class="ip-type-badge ip-type-v6">IPv6</span><span class="node-ip"><button class="node-ip-link" type="button" title="点击跳转 ITDOG IPv6 检测" onclick="openITDog('${escapeHtml(n.ipv6)}')">${escapeHtml(n.ipv6)}</button></span><button class="node-ip-copy" type="button" title="复制 IPv6" onclick="copyText('${escapeHtml(n.ipv6)}')">${copySvg}</button><span class="node-location" data-ip="${escapeHtml(n.ipv6)}" onclick="toggleLocation(this)">查询归属地...</span></div>`);
         const domainLine = n.domain ? `<span class="node-domain" title="${escapeHtml(n.domain)}">域名：${escapeHtml(n.domain)}</span>` : '';
         return `
         <div class="node-card" data-ip="${escapeHtml(n.ip)}">
@@ -1017,9 +1017,7 @@ function buildNodeStructure(nodes, isRunning) {
               <div class="node-sub-info">
                 <div class="node-ip-list">${addresses.join('')}</div>
                 ${domainLine}
-                ${n.ipv4 ? `<span class="node-location" data-ip="${escapeHtml(n.ipv4)}" onclick="toggleLocation(this)">IPv4 归属地查询...</span>` : ''}
-                ${n.ipv6 ? `<span class="node-location" data-ip="${escapeHtml(n.ipv6)}" onclick="toggleLocation(this)">IPv6 归属地查询...</span>` : ''}
-              </div>
+                              </div>
             </div>
           </div>
           <div class="node-network-results">
