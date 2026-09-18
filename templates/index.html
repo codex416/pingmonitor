@@ -683,6 +683,9 @@
   filter: none !important;
 }
 
+
+/* TCPing / 双栈检测 */
+.node-check-config{display:grid;grid-template-columns:1fr 1fr;gap:8px}.node-check-option label{display:block;margin:0 0 6px;font-size:12px;color:var(--text-muted);font-weight:500}.node-check-summary{display:flex;gap:6px;flex-wrap:wrap;font-size:11px;color:var(--text-muted);margin-top:2px}.node-check-mode{color:var(--ios-blue);font-weight:600}.node-network-results{display:flex;flex-direction:column;gap:4px;width:100%;margin-top:2px}.network-result-row{display:grid;grid-template-columns:42px minmax(0,1fr) auto;align-items:center;gap:7px;min-height:23px;font-size:11px}.network-family{color:var(--ios-blue);font-weight:700}.network-family-v6{color:#5856d6}.network-address{color:#636366;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-variant-numeric:tabular-nums}.network-metric{text-align:right;color:var(--text-muted);font-variant-numeric:tabular-nums;white-space:nowrap}.network-online{color:#248a3d}.network-offline{color:var(--ios-red)}.network-unavailable{color:#aeaeb2}@media(max-width:600px){.node-check-config{grid-template-columns:1fr}.network-result-row{grid-template-columns:40px minmax(0,1fr)}.network-metric{grid-column:2;text-align:left;margin-top:-3px}}
 </style>
 <link rel="icon" type="image/x-icon" href="/static/favicon.ico">
 <link rel="shortcut icon" type="image/x-icon" href="/static/favicon.ico">
@@ -735,6 +738,12 @@
               <div class="input-group">
                 <input class="ios-input" id="name" placeholder="节点名称（例如: 香港服务器）">
                 <input class="ios-input" id="ip" placeholder="IP 地址或域名">
+                <div class="node-check-config">
+                  <div class="node-check-option"><label>检测方式</label><select class="ios-input" id="check">
+                    <option value="both" selected>ICMP + TCPing</option><option value="ping">仅 ICMP</option><option value="tcp">仅 TCPing</option>
+                  </select></div>
+                  <div class="node-check-option"><label>TCPing 端口</label><input class="ios-input" id="port" type="number" min="1" max="65535" value="443" placeholder="443"></div>
+                </div>
                 <button class="ios-btn" onclick="addNode()">添加节点</button>
               </div>
             </div>
@@ -810,6 +819,10 @@
       <label for="edit-ip">IP 地址或域名</label>
       <input class="ios-input" id="edit-ip" autocomplete="off">
     </div>
+    <div class="edit-modal-field"><label for="edit-check">检测方式</label><select class="ios-input" id="edit-check">
+      <option value="both">ICMP + TCPing</option><option value="ping">仅 ICMP</option><option value="tcp">仅 TCPing</option>
+    </select></div>
+    <div class="edit-modal-field"><label for="edit-port">TCPing 端口</label><input class="ios-input" id="edit-port" type="number" min="1" max="65535" value="443" autocomplete="off"></div>
     <div class="edit-modal-actions">
       <button class="edit-cancel-btn" type="button" onclick="closeEditModal()">取消</button>
       <button class="edit-save-btn" type="button" onclick="saveEditNode()">保存</button>
@@ -928,8 +941,8 @@ async function refreshIPLocations(nodes) {
 }
 
 function nodeStatusData(node, statusMap, isRunning) {
-    if (!isRunning) return { name: node.name, ip: node.ip, status: "等待检测", delay: "-", last: "-", fail: 0 };
-    return statusMap[node.ip] ? { ...statusMap[node.ip] } : { name: node.name, ip: node.ip, status: "检测中", delay: "-", last: "-", fail: 0 };
+    if (!isRunning) return { name: node.name, ip: node.ip, status: "等待检测", delay: "-", last: "-", fail: 0, check: node.check || "ping", port: Number(node.port) || 443 };
+    return statusMap[node.ip] ? { ...statusMap[node.ip] } : { name: node.name, ip: node.ip, status: "检测中", delay: "-", last: "-", fail: 0, check: node.check || "ping", port: Number(node.port) || 443 };
 }
 
 function getIPType(ip) {
@@ -963,6 +976,11 @@ function buildNodeStructure(nodes, isRunning) {
                   <button class="node-ip-copy" type="button" title="复制 IP" aria-label="复制 IP" onclick="copyText('${escapeHtml(n.ip)}')"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"></rect><path d="M15 9V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h3"></path></svg></button>
                 </div>
                 <span class="node-location" data-ip="${escapeHtml(n.ip)}" onclick="toggleLocation(this)">查询归属地...</span>
+                <div class="node-check-summary"><span class="node-check-mode">${n.check === 'tcp' ? 'TCPing' : (n.check === 'both' ? 'ICMP + TCPing' : 'ICMP')}</span><span class="node-check-port">${n.check === 'ping' ? '' : 'TCP:' + (Number(n.port) || 443)}</span></div>
+                <div class="node-network-results">
+                  <div class="network-result-row"><span class="network-family">IPv4</span><span class="network-address" data-role="ipv4-address">未检测</span><span class="network-metric" data-role="ipv4-metric">--</span></div>
+                  <div class="network-result-row"><span class="network-family network-family-v6">IPv6</span><span class="network-address" data-role="ipv6-address">未检测</span><span class="network-metric" data-role="ipv6-metric">--</span></div>
+                </div>
               </div>
             </div>
             <div class="node-status-wrapper"><span class="delay-text node-delay">-</span></div>
@@ -982,35 +1000,35 @@ function buildNodeStructure(nodes, isRunning) {
     return '<div class="node-cards-grid' + (sortMode ? ' sorting' : '') + '">' + html + '</div>';
 }
 
+function updateNetworkRow(card, role, family, check, port) {
+    const a=card.querySelector(`[data-role="${role}-address"]`), m=card.querySelector(`[data-role="${role}-metric"]`);
+    if (!a || !m) return;
+    if (!family || !family.available) { a.innerText="未发现"; m.innerText="—"; m.className="network-metric network-unavailable"; return; }
+    a.innerText=family.address || "—";
+    const ic=family.icmp||{}, tcp=family.tcp||{}, parts=[];
+    if (check==="ping"||check==="both") parts.push(ic.status==="online" ? `ICMP ${ic.delay ?? "-"}ms` : "ICMP 失败");
+    if (check==="tcp"||check==="both") parts.push(tcp.status==="online" ? `TCP:${port} ${tcp.delay ?? "-"}ms` : `TCP:${port} 失败`);
+    m.innerText=parts.join(" · ");
+    m.className="network-metric "+(family.status==="online" ? "network-online" : "network-offline");
+}
 function updateNodeCard(card, item) {
     if (!card) return;
-    const statusEl = card.querySelector('.node-status');
-    const delayEl = card.querySelector('.node-delay');
-    const lastEl = card.querySelector('.node-last');
-    const failEl = card.querySelector('.node-fail');
-    const status = item.status || "检测中";
-    const numDelay = parseInt(item.delay);
-    const badgeCls = status === "在线" ? "badge-online" : (status === "离线" ? "badge-offline" : "badge-checking");
-    const delayCls = !isNaN(numDelay) ? (numDelay < 150 ? 'delay-good' : (numDelay < 400 ? 'delay-medium' : 'delay-bad')) : "";
-    const failCount = parseInt(item.fail) || 0;
-
-    if (statusEl) {
-        statusEl.className = "node-status-dot node-status " + badgeCls;
-    }
-    if (delayEl) {
-        delayEl.className = "delay-text node-delay " + delayCls;
-        delayEl.innerText = String(item.delay ?? "-");
-    }
-    if (lastEl) lastEl.innerText = String(item.last ?? "-");
-    if (failEl) {
-        failEl.hidden = failCount <= 0;
-        failEl.innerText = failCount > 0 ? `连续失败: ${failCount}次` : "";
-    }
+    const statusEl=card.querySelector('.node-status'), delayEl=card.querySelector('.node-delay'), lastEl=card.querySelector('.node-last'), failEl=card.querySelector('.node-fail');
+    const status=item.status||"检测中", numDelay=parseFloat(item.delay);
+    const badgeCls=status==="在线"?"badge-online":(status==="离线"?"badge-offline":"badge-checking");
+    const delayCls=!isNaN(numDelay)?(numDelay<150?'delay-good':(numDelay<400?'delay-medium':'delay-bad')):"";
+    const failCount=parseInt(item.fail)||0, check=item.check||"ping", port=Number(item.port)||443;
+    if(statusEl) statusEl.className="node-status-dot node-status "+badgeCls;
+    if(delayEl){delayEl.className="delay-text node-delay "+delayCls;delayEl.innerText=String(item.delay??"-");}
+    updateNetworkRow(card,"ipv4",item.ipv4,check,port);
+    updateNetworkRow(card,"ipv6",item.ipv6,check,port);
+    if(lastEl) lastEl.innerText=String(item.last??"-");
+    if(failEl){failEl.hidden=failCount<=0;failEl.innerText=failCount>0?`连续失败: ${failCount}次`:"";}
 }
 
 function renderNodeStructureIfNeeded(nodes, isRunning) {
     const signature = JSON.stringify({
-        nodes: nodes.map(n => ({ name: n.name || "", ip: n.ip || "" })),
+        nodes: nodes.map(n => ({ name: n.name || "", ip: n.ip || "", check: n.check || "ping", port: Number(n.port) || 443 })),
         running: !!isRunning,
         sorting: !!sortMode
     });
@@ -1148,7 +1166,9 @@ async function addNode(){
     const name = $("name").value.trim(), ip = $("ip").value.trim();
     if (!ip) { showToast("请输入有效的 IP 地址或域名"); return; }
     
-    const result = await apiPost("/api/add", { name, ip }, "节点添加成功");
+    const check = $("check").value, port = Number($("port").value || 443);
+    if (port < 1 || port > 65535) { showToast("TCP端口必须为 1-65535"); return; }
+    const result = await apiPost("/api/add", { name, ip, check, port }, "节点添加成功");
     if (result) {
         $("name").value = "";
         $("ip").value = "";
@@ -1305,6 +1325,8 @@ async function openEditModal(ip) {
     editingOriginalIP = ip;
     $("edit-name").value = node.name || "";
     $("edit-ip").value = node.ip || "";
+    $("edit-check").value = node.check || "ping";
+    $("edit-port").value = Number(node.port) || 443;
     $("edit-modal-overlay").classList.add("open");
     setTimeout(() => $("edit-name").focus(), 50);
 }
@@ -1320,7 +1342,9 @@ async function saveEditNode() {
     if (!ip) { showToast("请输入有效的 IP 地址或域名"); return; }
     if (!editingOriginalIP) { closeEditModal(); return; }
 
-    const result = await apiPost("/api/edit", { old_ip: editingOriginalIP, name, ip }, "节点信息已更新");
+    const check = $("edit-check").value, port = Number($("edit-port").value || 443);
+    if (port < 1 || port > 65535) { showToast("TCP端口必须为 1-65535"); return; }
+    const result = await apiPost("/api/edit", { old_ip: editingOriginalIP, name, ip, check, port }, "节点信息已更新");
     if (result) {
         delete ipLocationCache[editingOriginalIP];
         delete ipLocationCache[ip];
