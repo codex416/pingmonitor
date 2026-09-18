@@ -267,13 +267,7 @@ def add_node():
                 write_log(f"添加节点失败: 节点 [{ip}] 已存在")
                 return jsonify({"ok": False, "msg": "节点已存在"})
 
-        try:
-            port = int(data.get("port", 22))
-        except (TypeError, ValueError):
-            port = 443
-        if port < 1 or port > 65535:
-            return jsonify({"ok": False, "msg": "TCPing端口必须为 1-65535"})
-        cfg.setdefault("nodes", []).append({"name": name, "ip": ip, "port": port})
+        cfg.setdefault("nodes", []).append({"name": name, "ip": ip})
         save_json_atomic(CONFIG_FILE, cfg)
 
         write_log(f"添加节点成功: 名称=[{name}], IP/域名=[{ip}]")
@@ -345,15 +339,8 @@ def edit_node():
             write_log(f"编辑节点失败: 节点 [{new_ip}] 已存在")
             return jsonify({"ok": False, "msg": "新 IP/域名已存在"})
 
-        try:
-            port = int(data.get("port", target.get("port", 22)))
-        except (TypeError, ValueError):
-            port = 443
-        if port < 1 or port > 65535:
-            return jsonify({"ok": False, "msg": "TCPing端口必须为 1-65535"})
         target["name"] = new_name
         target["ip"] = new_ip
-        target["port"] = port
         save_json_atomic(CONFIG_FILE, cfg)
 
         # IP 改变后清理旧状态，避免旧 IP 残留在面板。
