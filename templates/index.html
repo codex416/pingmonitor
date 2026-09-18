@@ -735,7 +735,6 @@
               <div class="input-group">
                 <input class="ios-input" id="name" placeholder="节点名称（例如: 香港服务器）">
                 <input class="ios-input" id="ip" placeholder="IP 地址或域名">
-                <input class="ios-input" id="add-port" type="number" min="1" max="65535" value="22" placeholder="TCPing 端口">
                 <button class="ios-btn" onclick="addNode()">添加节点</button>
               </div>
             </div>
@@ -810,10 +809,6 @@
     <div class="edit-modal-field">
       <label for="edit-ip">IP 地址或域名</label>
       <input class="ios-input" id="edit-ip" autocomplete="off">
-    </div>
-    <div class="edit-modal-field">
-      <label for="edit-port">TCPing 端口</label>
-      <input class="ios-input" id="edit-port" type="number" min="1" max="65535" value="22" autocomplete="off">
     </div>
     <div class="edit-modal-actions">
       <button class="edit-cancel-btn" type="button" onclick="closeEditModal()">取消</button>
@@ -970,7 +965,7 @@ function buildNodeStructure(nodes, isRunning) {
                 <span class="node-location" data-ip="${escapeHtml(n.ip)}" onclick="toggleLocation(this)">查询归属地...</span>
               </div>
             </div>
-            <div class="node-status-wrapper"><span class="delay-text node-delay">-</span><span class="node-tcp-delay">TCP 22: -</span></div>
+            <div class="node-status-wrapper"><span class="delay-text node-delay">-</span></div>
           </div>
           <div class="node-bottom-row">
             <div class="node-stats-group">
@@ -992,7 +987,6 @@ function updateNodeCard(card, item) {
     const statusEl = card.querySelector('.node-status');
     const delayEl = card.querySelector('.node-delay');
     const lastEl = card.querySelector('.node-last');
-    const tcpEl = card.querySelector('.node-tcp-delay');
     const failEl = card.querySelector('.node-fail');
     const status = item.status || "检测中";
     const numDelay = parseInt(item.delay);
@@ -1008,7 +1002,6 @@ function updateNodeCard(card, item) {
         delayEl.innerText = String(item.delay ?? "-");
     }
     if (lastEl) lastEl.innerText = String(item.last ?? "-");
-    if (tcpEl) tcpEl.innerText = "TCP " + String(item.tcp_port ?? 22) + ": " + String(item.tcp_delay ?? "-");
     if (failEl) {
         failEl.hidden = failCount <= 0;
         failEl.innerText = failCount > 0 ? `连续失败: ${failCount}次` : "";
@@ -1153,15 +1146,12 @@ async function apiPost(url, data, successMsg) {
 
 async function addNode(){
     const name = $("name").value.trim(), ip = $("ip").value.trim();
-    const port = parseInt($("add-port").value, 10) || 22;
-    if (port < 1 || port > 65535) { showToast("TCPing端口必须为 1-65535"); return; }
     if (!ip) { showToast("请输入有效的 IP 地址或域名"); return; }
     
-    const result = await apiPost("/api/add", { name, ip, port }, "节点添加成功");
+    const result = await apiPost("/api/add", { name, ip }, "节点添加成功");
     if (result) {
         $("name").value = "";
         $("ip").value = "";
-        $("add-port").value = 22;
     }
 }
 
@@ -1315,7 +1305,6 @@ async function openEditModal(ip) {
     editingOriginalIP = ip;
     $("edit-name").value = node.name || "";
     $("edit-ip").value = node.ip || "";
-    $("edit-port").value = node.port || 22;
     $("edit-modal-overlay").classList.add("open");
     setTimeout(() => $("edit-name").focus(), 50);
 }
@@ -1328,12 +1317,10 @@ function closeEditModal() {
 async function saveEditNode() {
     const name = $("edit-name").value.trim();
     const ip = $("edit-ip").value.trim();
-    const port = parseInt($("edit-port").value, 10) || 22;
-    if (port < 1 || port > 65535) { showToast("TCPing端口必须为 1-65535"); return; }
     if (!ip) { showToast("请输入有效的 IP 地址或域名"); return; }
     if (!editingOriginalIP) { closeEditModal(); return; }
 
-    const result = await apiPost("/api/edit", { old_ip: editingOriginalIP, name, ip, port }, "节点信息已更新");
+    const result = await apiPost("/api/edit", { old_ip: editingOriginalIP, name, ip }, "节点信息已更新");
     if (result) {
         delete ipLocationCache[editingOriginalIP];
         delete ipLocationCache[ip];
