@@ -354,9 +354,20 @@ def edit_node():
             write_log(f"编辑节点失败: 节点 [{new_ip}] 已存在")
             return jsonify({"ok": False, "msg": "新 IP/域名已存在"})
 
+        target_changed = (
+            str(target.get("ip", "")).strip() != new_ip
+            or int(target.get("port", 22) or 22) != port
+        )
+
         target["name"] = new_name
         target["ip"] = new_ip
         target["port"] = port
+
+        # 每次修改检测目标(IP/域名或端口)都递增版本号。
+        # 即使用户改成其他目标后又立即改回原目标，也能确保监控线程识别到变化并立即重测。
+        if target_changed:
+            target["_target_version"] = int(target.get("_target_version", 0) or 0) + 1
+
         save_json_atomic(CONFIG_FILE, cfg)
 
         # IP 改变后清理旧状态，避免旧 IP 残留在面板。
