@@ -1,255 +1,229 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-import json, time, socket, subprocess, threading, requests, os, re
+import json
+import time
+import subprocess
+import threading
+import requests
+import os
+import re
 from datetime import datetime
 
-BASE_DIR="/opt/pingmonitor"
-CONFIG=os.path.join(BASE_DIR,"config.json")
-LOG_DIR=os.path.join(BASE_DIR,"logs")
-LOG_FILE=os.path.join(LOG_DIR,"monitor.log")
-STATUS_FILE=os.path.join(BASE_DIR,"status.json")
-DEFAULT_INTERVAL=60
-DEFAULT_PORT=443
-DEFAULT_CHECK="ping"
-TCP_TIMEOUT=5
-PING_TIMEOUT=3
+BASE_DIR = "/opt/pingmonitor"
+CONFIG = os.path.join(BASE_DIR, "config.json")
+LOG_DIR = os.path.join(BASE_DIR, "logs")
+LOG_FILE = os.path.join(LOG_DIR, "monitor.log")
+STATUS_FILE = os.path.join(BASE_DIR, "status.json")
+
 
 class Monitor:
-    def __init__(self):
-        self.running_nodes={}
-        self.status_lock=threading.Lock()
-        os.makedirs(LOG_DIR,exist_ok=True)
 
-    def log(self,msg):
-        text=f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] {msg}"
-        print(text,flush=True)
+    def __init__(self):
+        self.running_nodes = {}
+        os.makedirs(LOG_DIR, exist_ok=True)
+
+    def log(self, msg):
+        """记录日志并强制维持 666 可读写权限，解决 Web 端权限锁死问题"""
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        text = f"[{timestamp}] {msg}"
+
+        print(text, flush=True)
+
         try:
-            os.makedirs(LOG_DIR,exist_ok=True)
-            with open(LOG_FILE,"a",encoding="utf-8") as f: f.write(text+"\n")
-            try: os.chmod(LOG_FILE,0o666)
-            except Exception: pass
-        except Exception as e: print(f"[Log Error] 写入日志失败: {e}")
+            os.makedirs(LOG_DIR, exist_ok=True)
+            
+            # 以追加模式写入日志
+            with open(LOG_FILE, "a", encoding="utf-8") as f:
+                f.write(text + "\n")
+
+            # 关键：由于后台以 root 运行，每次写入后保持权限为 666，供 www-data (Web 端) 自由追加与清空
+            try:
+                os.chmod(LOG_FILE, 0o666)
+            except Exception:
+                pass
+        except Exception as e:
+            print(f"[Log Error] 写入日志失败: {e}")
 
     def load_config(self):
         try:
-            with open(CONFIG,"r",encoding="utf-8") as f:
-                data=json.load(f)
-                return data if isinstance(data,dict) else {"nodes":[],"worker":"","interval":DEFAULT_INTERVAL}
+            with open(CONFIG, "r", encoding="utf-8") as f:
+                return json.load(f)
         except Exception:
-            return {"nodes":[],"worker":"","interval":DEFAULT_INTERVAL}
+            return {"nodes": [], "worker": "", "interval": 60}
 
-    def save_status(self,data):
-        tmp=STATUS_FILE+".tmp"
+    def save_status(self, data):
+        """原子化保存状态文件，防止并发冲突"""
+        temp_file = f"{STATUS_FILE}.tmp"
         try:
-            with open(tmp,"w",encoding="utf-8") as f: json.dump(data,f,indent=4,ensure_ascii=False)
-            os.replace(tmp,STATUS_FILE)
-            try: os.chmod(STATUS_FILE,0o666)
-            except Exception: pass
-        except Exception as e: print(f"[Status Save Error] 保存状态失败: {e}")
+            with open(temp_file, "w", encoding="utf-8") as f:
+                json.dump(data, f, indent=4, ensure_ascii=False)
+            os.replace(temp_file, STATUS_FILE)
+            try:
+                os.chmod(STATUS_FILE, 0o666)
+            except Exception:
+                pass
+        except Exception as e:
+            print(f"[Status Save Error] 保存状态失败: {e}")
 
-    def _read_status(self):
+    def update_status(self, node, status, delay="-", fail=0):
+        data = {}
         try:
-            if not os.path.exists(STATUS_FILE): return {}
-            with open(STATUS_FILE,"r",encoding="utf-8") as f:
-                d=json.load(f); return d if isinstance(d,dict) else {}
-        except Exception: return {}
+            if os.path.exists(STATUS_FILE):
+                with open(STATUS_FILE, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+        except Exception:
+            data = {}
 
-    def update_status(self,node,result,fail=0):
-        with self.status_lock:
-            data=self._read_status()
-            result["name"]=node["name"]; result["ip"]=node["ip"]; result["fail"]=fail
-            result["last"]=datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            data[node["ip"]]=result
-            self.save_status(data)
+        data[node["ip"]] = {
+            "name": node["name"],
+            "ip": node["ip"],
+            "status": status,
+            "delay": delay,
+            "fail": fail,
+            "last": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        }
+        self.save_status(data)
 
-    def delete_status(self,ip):
-        with self.status_lock:
-            data=self._read_status()
+    def delete_status(self, ip):
+        try:
+            if not os.path.exists(STATUS_FILE):
+                return
+
+            with open(STATUS_FILE, "r", encoding="utf-8") as f:
+                data = json.load(f)
+
             if ip in data:
-                del data[ip]; self.save_status(data)
+                del data[ip]
+                self.save_status(data)
+        except Exception:
+            pass
 
-    @staticmethod
-    def clean_host(host):
-        host=str(host or "").strip()
-        return host[1:-1] if host.startswith("[") and host.endswith("]") else host
-
-    def resolve_targets(self,host):
-        host=self.clean_host(host)
-        out={"ipv4":[],"ipv6":[]}
+    def ping(self, ip):
         try:
-            socket.inet_pton(socket.AF_INET,host); out["ipv4"]=[host]; return out
-        except OSError: pass
+            result = subprocess.run(
+                ["ping", "-c", "1", "-W", "3", ip],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.DEVNULL,
+                text=True
+            )
+
+            if result.returncode != 0:
+                return False, "-"
+
+            m = re.search(r'time[=<]?\s*([\d.]+)', result.stdout)
+            if m:
+                return True, m.group(1) + "ms"
+
+            return True, "-"
+        except Exception:
+            return False, "-"
+
+    def notify(self, node, worker):
+        if not worker:
+            return
+
         try:
-            socket.inet_pton(socket.AF_INET6,host); out["ipv6"]=[host]; return out
-        except OSError: pass
-        try:
-            infos=socket.getaddrinfo(host,None,socket.AF_UNSPEC,socket.SOCK_STREAM)
-        except socket.gaierror:
-            return out
-        for info in infos:
-            fam=info[0]; addr=info[4][0]
-            key="ipv6" if fam==socket.AF_INET6 else "ipv4" if fam==socket.AF_INET else None
-            if key and addr not in out[key]: out[key].append(addr)
-        return out
-
-    @staticmethod
-    def parse_ping_delay(output):
-        m=re.search(r"time[=<]\s*([0-9]+(?:\.[0-9]+)?)",output or "",re.I)
-        return round(float(m.group(1)),2) if m else None
-
-    def ping(self,host):
-        host=self.clean_host(host)
-        v6=":" in host
-        commands=([["ping","-6","-c","1","-W",str(PING_TIMEOUT),host],
-                   ["ping6","-c","1","-W",str(PING_TIMEOUT),host]]
-                  if v6 else
-                  [["ping","-4","-c","1","-W",str(PING_TIMEOUT),host],
-                   ["ping","-c","1","-W",str(PING_TIMEOUT),host]])
-        for cmd in commands:
-            try:
-                r=subprocess.run(cmd,stdout=subprocess.PIPE,stderr=subprocess.DEVNULL,text=True,timeout=PING_TIMEOUT+2)
-                if r.returncode==0:
-                    return {"status":"online","delay":self.parse_ping_delay(r.stdout),"error":""}
-            except (FileNotFoundError,subprocess.TimeoutExpired,OSError): pass
-        return {"status":"offline","delay":None,"error":"ICMP 不可达"}
-
-    def tcping(self,host,port):
-        host=self.clean_host(host); fam=socket.AF_INET6 if ":" in host else socket.AF_INET
-        started=time.perf_counter(); s=socket.socket(fam,socket.SOCK_STREAM); s.settimeout(TCP_TIMEOUT)
-        try:
-            s.connect((host,port,0,0) if fam==socket.AF_INET6 else (host,port))
-            return {"status":"online","delay":round((time.perf_counter()-started)*1000,2),"port":port,"error":""}
-        except (socket.timeout,ConnectionRefusedError,OSError) as e:
-            return {"status":"offline","delay":None,"port":port,"error":str(e)}
-        finally: s.close()
-
-    @staticmethod
-    def normalize_node(raw):
-        check=str(raw.get("check","ping")).strip().lower()
-        if check not in {"ping","tcp","both"}: check="ping"
-        try: port=int(raw.get("port",DEFAULT_PORT))
-        except (TypeError,ValueError): port=DEFAULT_PORT
-        legacy_ip=str(raw.get("ip") or "").strip()
-        ipv4=str(raw.get("ipv4") or "").strip()
-        ipv6=str(raw.get("ipv6") or "").strip()
-        # 兼容旧版：没有独立 IPv4/IPv6 字段时，从 ip 继承。
-        if not ipv4 and not ipv6 and legacy_ip:
-            try:
-                parsed=socket.inet_pton(socket.AF_INET,legacy_ip.strip("[]"))
-                ipv4=legacy_ip
-            except OSError:
-                try:
-                    socket.inet_pton(socket.AF_INET6,legacy_ip.strip("[]"))
-                    ipv6=legacy_ip
-                except OSError:
-                    pass
-        primary=ipv4 or ipv6 or legacy_ip
-        return {"name":str(raw.get("name") or primary or "未命名").strip(),
-                "ip":primary,"ipv4":ipv4,"ipv6":ipv6,"check":check,
-                "port":max(1,min(65535,port))}
-
-    def check_target(self,address,check,port):
-        r={"address":address,"icmp":{"status":"disabled","delay":None},
-           "tcp":{"status":"disabled","delay":None,"port":port}}
-        if check in {"ping","both"}: r["icmp"]=self.ping(address)
-        if check in {"tcp","both"}: r["tcp"]=self.tcping(address,port)
-        oks=[]
-        if check in {"ping","both"}: oks.append(r["icmp"]["status"]=="online")
-        if check in {"tcp","both"}: oks.append(r["tcp"]["status"]=="online")
-        r["status"]="online" if any(oks) else "offline"
-        if check in {"tcp","both"} and r["tcp"]["status"]=="online":
-            r["delay"]=r["tcp"]["delay"]; r["delay_type"]="tcp"
-        elif check in {"ping","both"} and r["icmp"]["status"]=="online":
-            r["delay"]=r["icmp"]["delay"]; r["delay_type"]="icmp"
-        else: r["delay"]=None; r["delay_type"]=""
-        return r
-
-    def check_node_once(self,node):
-        check,port=node["check"],node["port"]; targets=self.resolve_targets(node["ip"]); families={}
-        for family in ("ipv4","ipv6"):
-            addrs=targets[family]
-            if not addrs:
-                families[family]={"available":False,"address":"","status":"unavailable","delay":None,
-                    "delay_type":"","icmp":{"status":"unavailable","delay":None},
-                    "tcp":{"status":"unavailable","delay":None,"port":port},"addresses":[],"attempts":[]}
-                continue
-            attempts=[self.check_target(a,check,port) for a in addrs]
-            best=next((x for x in attempts if x["status"]=="online"),attempts[0])
-            families[family]={"available":True,"address":best["address"],"status":best["status"],
-                "delay":best.get("delay"),"delay_type":best.get("delay_type",""),
-                "icmp":best.get("icmp"),"tcp":best.get("tcp"),"addresses":addrs,"attempts":attempts}
-        available=[families[f] for f in ("ipv4","ipv6") if families[f]["available"]]
-        online=[x for x in available if x["status"]=="online"]
-        delays=[x["delay"] for x in online if isinstance(x.get("delay"),(int,float))]
-        return {"status":"online" if online else "offline",
-                "delay":f"{min(delays):.2f}ms" if delays else "-","check":check,"port":port,
-                "ipv4":families["ipv4"],"ipv6":families["ipv6"]}
-
-    @staticmethod
-    def family_summary(f,check,port):
-        if not f.get("available"): return "未发现"
-        p=[]; ic=f.get("icmp") or {}; tcp=f.get("tcp") or {}
-        if check in {"ping","both"}: p.append(f"ICMP {ic.get('delay','-')}ms" if ic.get("status")=="online" else "ICMP 失败")
-        if check in {"tcp","both"}: p.append(f"TCP:{port} {tcp.get('delay','-')}ms" if tcp.get("status")=="online" else f"TCP:{port} 失败")
-        return " / ".join(p)
-
-    def notify(self,node,worker,result):
-        if not worker: return
-        try:
-            requests.post(worker,json={"name":node["name"],"ip":node["ip"],"port":node["port"],
-                "check":node["check"],"status":"DOWN","time":datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                "ipv4":result.get("ipv4"),"ipv6":result.get("ipv6")},timeout=10)
+            requests.post(
+                worker,
+                json={
+                    "name": node["name"],
+                    "ip": node["ip"],
+                    "status": "DOWN",
+                    "time": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                },
+                timeout=10
+            )
             self.log(f"{node['name']} TG通知成功")
-        except Exception as e: self.log(f"TG通知失败: {e}")
+        except Exception as e:
+            self.log(f"TG通知失败: {str(e)}")
 
-    def check_node(self,original):
-        original_ip=original["ip"]
+    def check_node(self, node):
+        ip = node["ip"]
+        name = node["name"]
+
         while True:
-            cfg=self.load_config()
-            raw=next((n for n in cfg.get("nodes",[]) if str(n.get("ip","")).strip()==original_ip),None)
-            if not raw:
-                self.delete_status(original_ip); self.running_nodes.pop(original_ip,None)
-                self.log(f"{original['name']} 已删除或 IP 已修改"); break
-            node=self.normalize_node(raw)
-            if not node["ip"]: self.running_nodes[original_ip]="stopped"; break
-            try: interval=max(5,int(cfg.get("interval",DEFAULT_INTERVAL)))
-            except (TypeError,ValueError): interval=DEFAULT_INTERVAL
-            worker=str(cfg.get("worker","") or "").strip()
-            result=self.check_node_once(node)
-            fail=0 if result["status"]=="online" else 1
-            self.update_status(node,result,fail)
-            self.log(f"{node['name']} [{node['ip']}] {'在线' if result['status']=='online' else '离线'} "
-                     f"检测={node['check']} TCP={node['port']} 延迟={result['delay']} "
-                     f"IPv4={self.family_summary(result['ipv4'],node['check'],node['port'])} "
-                     f"IPv6={self.family_summary(result['ipv6'],node['check'],node['port'])}")
-            if result["status"]=="online":
-                time.sleep(interval); continue
-            recovered=False
-            for wait in (3,5):
-                time.sleep(wait); retry=self.check_node_once(node)
-                if retry["status"]=="online":
-                    recovered=True; self.update_status(node,retry,0); self.log(f"{node['name']} 复测恢复 {retry['delay']}"); break
-            if recovered:
-                time.sleep(interval); continue
-            self.log(f"{node['name']} 连续复测失败，确认离线")
-            self.update_status(node,result,3); self.notify(node,worker,result)
-            self.running_nodes[original_ip]="stopped"; break
+            cfg = self.load_config()
+
+            # 每轮读取最新节点信息，支持网页端直接修改节点名称。
+            current_node = next((n for n in cfg.get("nodes", []) if n.get("ip") == ip), None)
+
+            # 节点已被删除或 IP 已被修改：结束旧 IP 的监控线程。
+            if not current_node:
+                self.delete_status(ip)
+                self.log(f"{name} 已删除或 IP 已修改")
+                if ip in self.running_nodes:
+                    del self.running_nodes[ip]
+                break
+
+            # 名称修改后立即采用最新名称，IP 不变时监控线程继续复用。
+            node = current_node
+            name = node.get("name", ip)
+
+            interval = cfg.get("interval", 60)
+            worker = cfg.get("worker", "")
+
+            ok, delay = self.ping(ip)
+
+            if ok:
+                self.update_status(node, "在线", delay, 0)
+                self.log(f"{name} 在线 {delay}")
+                time.sleep(interval)
+                continue
+
+            self.update_status(node, "离线", "-", 1)
+            self.log(f"{name} 第一次失败")
+            time.sleep(3)
+
+            ok, _ = self.ping(ip)
+            if ok:
+                continue
+
+            self.log(f"{name} 第二次失败")
+            time.sleep(5)
+
+            ok, _ = self.ping(ip)
+            if ok:
+                continue
+
+            self.log(f"{name} 第三次失败确认")
+            time.sleep(2)
+
+            a, _ = self.ping(ip)
+            time.sleep(1)
+            b, _ = self.ping(ip)
+
+            if not a and not b:
+                self.update_status(node, "离线", "-", 3)
+                self.log(f"{name} 故障停止检测")
+                self.notify(node, worker)
+
+                # 标记停止，不删除
+                self.running_nodes[ip] = "stopped"
+                break
 
     def manager(self):
         while True:
-            cfg=self.load_config(); current=set()
-            for raw in cfg.get("nodes",[]):
-                node=self.normalize_node(raw); ip=node["ip"]
-                if not ip: continue
-                current.add(ip)
+            cfg = self.load_config()
+
+            for node in cfg.get("nodes", []):
+                ip = node["ip"]
+
                 if ip not in self.running_nodes:
-                    self.running_nodes[ip]="running"
-                    threading.Thread(target=self.check_node,args=(node,),daemon=True).start()
-                    self.log(f"启动监控: {node['name']} [检测={node['check']}, TCP端口={node['port']}]")
+                    self.running_nodes[ip] = "running"
+                    threading.Thread(
+                        target=self.check_node,
+                        args=(node,),
+                        daemon=True
+                    ).start()
+                    self.log(f"启动监控: {node['name']}")
+
             time.sleep(10)
 
     def start(self):
-        self.log("PingMonitor启动"); self.manager()
+        self.log("PingMonitor启动")
+        self.manager()
 
-if __name__=="__main__": Monitor().start()
+
+if __name__ == "__main__":
+    Monitor().start()
