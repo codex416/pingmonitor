@@ -950,12 +950,13 @@ function getIPType(ip) {
     } catch { return 'IPv4'; }
 }
 
-function openITDog(ip) {
+function openTCPPing(ip, port) {
     const value = String(ip || '').trim().replace(/^\[|\]$/g, '');
+    const tcpPort = parseInt(port, 10) || 22;
     if (!value) return;
-    const isIPv6 = value.includes(':');
-    const base = isIPv6 ? 'https://www.itdog.cn/ping_ipv6/' : 'https://www.itdog.cn/ping/';
-    window.open(base + value, '_blank', 'noopener');
+
+    const url = 'https://www.itdog.cn/tcping/' + encodeURIComponent(value) + ':' + tcpPort;
+    window.open(url, '_blank', 'noopener');
 }
 
 function buildNodeStructure(nodes, isRunning) {
@@ -971,7 +972,7 @@ function buildNodeStructure(nodes, isRunning) {
                 <div class="node-ip-wrap">
                   <span class="ip-type-badge ${getIPType(n.ip) === 'IPv6' ? 'ip-type-v6' : 'ip-type-v4'}">${getIPType(n.ip)}</span>
                   <span class="tcp-port-badge">TCP ${escapeHtml(n.port || 22)}</span>
-                  <span class="node-ip"><button class="node-ip-link" type="button" title="点击跳转 ITDOG 检测" onclick="openITDog('${escapeHtml(n.ip)}')">${escapeHtml(n.ip)}</button></span>
+                  <span class="node-ip"><button class="node-ip-link" type="button" title="点击跳转 TCPPing 检测" onclick="openTCPPing(${escapeHtml(n.ip)}')">${escapeHtml(n.ip)}</button></span>
                   <button class="node-ip-copy" type="button" title="复制 IP" aria-label="复制 IP" onclick="copyText('${escapeHtml(n.ip)}')"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"></rect><path d="M15 9V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h3"></path></svg></button>
                 </div>
                 <span class="node-location" data-ip="${escapeHtml(n.ip)}" onclick="toggleLocation(this)">查询归属地...</span>
