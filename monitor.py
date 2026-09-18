@@ -130,8 +130,23 @@ class Monitor:
         if check not in {"ping","tcp","both"}: check="ping"
         try: port=int(raw.get("port",DEFAULT_PORT))
         except (TypeError,ValueError): port=DEFAULT_PORT
-        return {"name":str(raw.get("name") or raw.get("ip") or "未命名").strip(),
-                "ip":str(raw.get("ip") or "").strip(),"check":check,
+        legacy_ip=str(raw.get("ip") or "").strip()
+        ipv4=str(raw.get("ipv4") or "").strip()
+        ipv6=str(raw.get("ipv6") or "").strip()
+        # 兼容旧版：没有独立 IPv4/IPv6 字段时，从 ip 继承。
+        if not ipv4 and not ipv6 and legacy_ip:
+            try:
+                parsed=socket.inet_pton(socket.AF_INET,legacy_ip.strip("[]"))
+                ipv4=legacy_ip
+            except OSError:
+                try:
+                    socket.inet_pton(socket.AF_INET6,legacy_ip.strip("[]"))
+                    ipv6=legacy_ip
+                except OSError:
+                    pass
+        primary=ipv4 or ipv6 or legacy_ip
+        return {"name":str(raw.get("name") or primary or "未命名").strip(),
+                "ip":primary,"ipv4":ipv4,"ipv6":ipv6,"check":check,
                 "port":max(1,min(65535,port))}
 
     def check_target(self,address,check,port):
