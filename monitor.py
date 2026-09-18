@@ -8,7 +8,6 @@ import threading
 import requests
 import os
 import re
-import socket
 from datetime import datetime
 
 BASE_DIR = "/opt/pingmonitor"
@@ -67,7 +66,7 @@ class Monitor:
         except Exception as e:
             print(f"[Status Save Error] 保存状态失败: {e}")
 
-    def update_status(self, node, status, delay="-", fail=0, tcp_status=None, tcp_delay="-", tcp_port=22):
+    def update_status(self, node, status, delay="-", fail=0):
         data = {}
         try:
             if os.path.exists(STATUS_FILE):
@@ -82,9 +81,6 @@ class Monitor:
             "status": status,
             "delay": delay,
             "fail": fail,
-            "tcp_status": tcp_status,
-            "tcp_delay": tcp_delay,
-            "tcp_port": tcp_port,
             "last": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         }
         self.save_status(data)
@@ -120,14 +116,6 @@ class Monitor:
                 return True, m.group(1) + "ms"
 
             return True, "-"
-        except Exception:
-            return False, "-"
-
-    def tcping(self, ip, port=22):
-        try:
-            started = time.perf_counter()
-            with socket.create_connection((ip, int(port)), timeout=3):
-                return True, f"{round((time.perf_counter() - started) * 1000, 2)}ms"
         except Exception:
             return False, "-"
 
@@ -175,19 +163,11 @@ class Monitor:
             interval = cfg.get("interval", 60)
             worker = cfg.get("worker", "")
 
-            try:
-                port = int(node.get("port", 22))
-            except (TypeError, ValueError):
-                port = 443
-            if port < 1 or port > 65535:
-                port = 443
-
             ok, delay = self.ping(ip)
-            tcp_ok, tcp_delay = self.tcping(ip, port)
 
             if ok:
-                self.update_status(node, "在线", delay, 0, "在线" if tcp_ok else "离线", tcp_delay, port)
-                self.log(f"{name} 在线 ICMP {delay} TCP {port} {tcp_delay}")
+                self.update_status(node, "在线", delay, 0)
+                self.log(f"{name} 在线 {delay}")
                 time.sleep(interval)
                 continue
 
