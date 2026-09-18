@@ -706,6 +706,9 @@
   .network-result-row{grid-template-columns:40px minmax(0,1fr)}
   .network-metric{white-space:normal}
 }
+
+.node-domain{font-size:12px;color:var(--text-muted);display:block;width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.node-ip-copy svg{width:16px;height:16px;display:block}
 </style>
 <link rel="icon" type="image/x-icon" href="/static/favicon.ico">
 <link rel="shortcut icon" type="image/x-icon" href="/static/favicon.ico">
@@ -767,6 +770,10 @@
                 <div class="dual-ip-inputs">
                   <input class="ios-input" id="ipv4" placeholder="IPv4 地址（可选）" inputmode="numeric" autocomplete="off">
                   <input class="ios-input" id="ipv6" placeholder="IPv6 地址（可选）" inputmode="text" autocomplete="off">
+                </div>
+                <div style="display:flex;gap:8px;">
+                  <input class="ios-input" id="domain" placeholder="域名（可选，自动解析 IPv4 / IPv6）" autocomplete="off">
+                  <button class="ios-btn ios-btn-secondary" type="button" style="width:80px;flex-shrink:0;" onclick="resolveDomain()">解析</button>
                 </div>
                 <div class="node-check-config">
                   <div class="node-check-option"><label>检测方式</label><select class="ios-input" id="check">
@@ -996,36 +1003,29 @@ function openITDog(ip) {
 function buildNodeStructure(nodes, isRunning) {
     const html = nodes.map(n => {
         const addresses = [];
-        if (n.ipv4) addresses.push(`<div class="node-address-line"><span class="ip-type-badge ip-type-v4">IPv4</span><span class="node-ip"><button class="node-ip-link" type="button" title="点击跳转 ITDOG 检测" onclick="openITDog('${escapeHtml(n.ipv4)}')">${escapeHtml(n.ipv4)}</button></span><button class="node-ip-copy" type="button" title="复制 IPv4" onclick="copyText('${escapeHtml(n.ipv4)}')">复制</button></div>`);
-        if (n.ipv6) addresses.push(`<div class="node-address-line"><span class="ip-type-badge ip-type-v6">IPv6</span><span class="node-ip"><button class="node-ip-link" type="button" title="点击跳转 ITDOG IPv6 检测" onclick="openITDog('${escapeHtml(n.ipv6)}')">${escapeHtml(n.ipv6)}</button></span><button class="node-ip-copy" type="button" title="复制 IPv6" onclick="copyText('${escapeHtml(n.ipv6)}')">复制</button></div>`);
-
+        const copySvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"></rect><path d="M15 9V7a2 2 0 0 0-2-2H7a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"></path></svg>';
+        if (n.ipv4) addresses.push(`<div class="node-address-line"><span class="ip-type-badge ip-type-v4">IPv4</span><span class="node-ip"><button class="node-ip-link" type="button" title="点击跳转 ITDOG 检测" onclick="openITDog('${escapeHtml(n.ipv4)}')">${escapeHtml(n.ipv4)}</button></span><button class="node-ip-copy" type="button" title="复制 IPv4" onclick="copyText('${escapeHtml(n.ipv4)}')">${copySvg}</button></div>`);
+        if (n.ipv6) addresses.push(`<div class="node-address-line"><span class="ip-type-badge ip-type-v6">IPv6</span><span class="node-ip"><button class="node-ip-link" type="button" title="点击跳转 ITDOG IPv6 检测" onclick="openITDog('${escapeHtml(n.ipv6)}')">${escapeHtml(n.ipv6)}</button></span><button class="node-ip-copy" type="button" title="复制 IPv6" onclick="copyText('${escapeHtml(n.ipv6)}')">${copySvg}</button></div>`);
+        const domainLine = n.domain ? `<span class="node-domain" title="${escapeHtml(n.domain)}">域名：${escapeHtml(n.domain)}</span>` : '';
         return `
         <div class="node-card" data-ip="${escapeHtml(n.ip)}">
           <button class="node-sort-handle" type="button" aria-label="拖动排序"><span></span><span></span><span></span></button>
           <div class="node-top-row">
             <div class="node-identity">
-              <div class="node-name-row">
-                <span class="node-name" title="${escapeHtml(n.name || '未命名')}">${escapeHtml(n.name || '未命名')}</span>
-                <span class="node-status-inline"><i class="node-status-dot badge-checking node-status"></i><span class="node-status-text">检测中</span></span>
-              </div>
+              <span class="node-name" title="${escapeHtml(n.name || '未命名')}"><i class="node-status-dot badge-checking node-status"></i>${escapeHtml(n.name || '未命名')}</span>
               <div class="node-sub-info">
                 <div class="node-ip-list">${addresses.join('')}</div>
+                ${domainLine}
                 <span class="node-location" data-ip="${escapeHtml(n.ip)}" onclick="toggleLocation(this)">查询归属地...</span>
               </div>
             </div>
           </div>
-          <div class="node-network-section">
-            <div class="node-section-label">网络检测</div>
-            <div class="node-network-results">
-              ${n.ipv4 ? '<div class="network-result-row" data-family-row="ipv4"><span class="network-family">IPv4</span><span class="network-metric" data-role="ipv4-metric">--</span></div>' : ''}
-              ${n.ipv6 ? '<div class="network-result-row" data-family-row="ipv6"><span class="network-family network-family-v6">IPv6</span><span class="network-metric" data-role="ipv6-metric">--</span></div>' : ''}
-            </div>
+          <div class="node-network-results">
+            ${n.ipv4 ? '<div class="network-result-row" data-family-row="ipv4"><span class="network-family">IPv4</span><span class="network-metric" data-role="ipv4-metric">--</span></div>' : ''}
+            ${n.ipv6 ? '<div class="network-result-row" data-family-row="ipv6"><span class="network-family network-family-v6">IPv6</span><span class="network-metric" data-role="ipv6-metric">--</span></div>' : ''}
           </div>
           <div class="node-bottom-row">
-            <div class="node-stats-group">
-              <span>最后检测: <strong class="stat-val node-last">-</strong></span>
-              <span class="fail-tag node-fail" hidden></span>
-            </div>
+            <div class="node-stats-group"><span>最后检测: <strong class="stat-val node-last">-</strong></span><span class="fail-tag node-fail" hidden></span></div>
             <div class="node-action-group">
               <button class="action-btn-sm edit-btn" onclick="openEditModal('${escapeHtml(n.ip)}')">编辑</button>
               <button class="action-btn-sm del-btn" onclick="delNode('${escapeHtml(n.ip)}')">删除</button>
@@ -1081,7 +1081,7 @@ function updateNodeCard(card, item) {
 
 function renderNodeStructureIfNeeded(nodes, isRunning) {
     const signature = JSON.stringify({
-        nodes: nodes.map(n => ({ name: n.name || "", ip: n.ip || "", ipv4: n.ipv4 || "", ipv6: n.ipv6 || "", check: n.check || "ping", port: Number(n.port) || 443 })),
+        nodes: nodes.map(n => ({ name: n.name || "", ip: n.ip || "", domain: n.domain || "", ipv4: n.ipv4 || "", ipv6: n.ipv6 || "", check: n.check || "ping", port: Number(n.port) || 443 })),
         running: !!isRunning,
         sorting: !!sortMode
     });
@@ -1215,19 +1215,43 @@ async function apiPost(url, data, successMsg) {
     }
 }
 
+async function resolveDomain(showMessage = true) {
+    const domain = $("domain").value.trim();
+    if (!domain) { if (showMessage) showToast("请输入域名"); return null; }
+    try {
+        const res = await fetch("/api/resolve-domain", {
+            method: "POST", headers: {"Content-Type":"application/json"},
+            body: JSON.stringify({domain})
+        });
+        const json = await res.json().catch(() => ({}));
+        if (!res.ok || json.ok === false) { showToast(json.msg || json.error || "域名解析失败"); return null; }
+        $("ipv4").value = json.ipv4 || "";
+        $("ipv6").value = json.ipv6 || "";
+        if (showMessage) showToast("域名解析成功");
+        return json;
+    } catch {
+        showToast("域名解析失败");
+        return null;
+    }
+}
+
 async function addNode(){
     const name = $("name").value.trim();
+    const domain = $("domain").value.trim();
     const ipv4 = $("ipv4").value.trim();
     const ipv6 = $("ipv6").value.trim();
-    if (!ipv4 && !ipv6) { showToast("IPv4 或 IPv6 至少填写一个"); return; }
-    
+    if (!domain && !ipv4 && !ipv6) { showToast("IPv4、IPv6 或域名至少填写一个"); return; }
+    if (domain && !ipv4 && !ipv6) {
+        const resolved = await resolveDomain(false);
+        if (!resolved) return;
+    }
+    const finalIpv4 = $("ipv4").value.trim();
+    const finalIpv6 = $("ipv6").value.trim();
     const check = $("check").value, port = Number($("port").value || 443);
     if (port < 1 || port > 65535) { showToast("TCP端口必须为 1-65535"); return; }
-    const result = await apiPost("/api/add", { name, ipv4, ipv6, check, port }, "节点添加成功");
+    const result = await apiPost("/api/add", { name, domain, ipv4: finalIpv4, ipv6: finalIpv6, check, port }, "节点添加成功");
     if (result) {
-        $("name").value = "";
-        $("ipv4").value = "";
-        $("ipv6").value = "";
+        $("name").value = ""; $("domain").value = ""; $("ipv4").value = ""; $("ipv6").value = "";
     }
 }
 
@@ -1380,6 +1404,7 @@ async function openEditModal(ip) {
     if (!node) { showToast("未找到该节点"); return; }
     editingOriginalIP = ip;
     $("edit-name").value = node.name || "";
+    if ($("edit-domain")) $("edit-domain").value = node.domain || "";
     $("edit-ipv4").value = node.ipv4 || (node.ip && !String(node.ip).includes(":") ? node.ip : "");
     $("edit-ipv6").value = node.ipv6 || (node.ip && String(node.ip).includes(":") ? node.ip : "");
     $("edit-check").value = node.check || "ping";
@@ -1397,12 +1422,13 @@ async function saveEditNode() {
     const name = $("edit-name").value.trim();
     const ipv4 = $("edit-ipv4").value.trim();
     const ipv6 = $("edit-ipv6").value.trim();
-    if (!ipv4 && !ipv6) { showToast("IPv4 或 IPv6 至少填写一个"); return; }
+    const domain = $("edit-domain") ? $("edit-domain").value.trim() : "";
+    if (!domain && !ipv4 && !ipv6) { showToast("IPv4、IPv6 或域名至少填写一个"); return; }
     if (!editingOriginalIP) { closeEditModal(); return; }
 
     const check = $("edit-check").value, port = Number($("edit-port").value || 443);
     if (port < 1 || port > 65535) { showToast("TCP端口必须为 1-65535"); return; }
-    const result = await apiPost("/api/edit", { old_ip: editingOriginalIP, name, ipv4, ipv6, check, port }, "节点信息已更新");
+    const result = await apiPost("/api/edit", { old_ip: editingOriginalIP, name, domain, ipv4, ipv6, check, port }, "节点信息已更新");
     if (result) {
         delete ipLocationCache[editingOriginalIP];
         delete ipLocationCache[ipv4];
