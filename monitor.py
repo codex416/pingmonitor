@@ -67,7 +67,7 @@ class Monitor:
         except Exception as e:
             print(f"[Status Save Error] 保存状态失败: {e}")
 
-    def update_status(self, node, status, delay="-", fail=0, tcp_status=None, tcp_delay="-", tcp_port=443):
+    def update_status(self, node, status, delay="-", fail=0, tcp_status=None, tcp_delay="-", tcp_port=22):
         data = {}
         try:
             if os.path.exists(STATUS_FILE):
@@ -123,7 +123,7 @@ class Monitor:
         except Exception:
             return False, "-"
 
-    def tcping(self, ip, port=443):
+    def tcping(self, ip, port=22):
         try:
             started = time.perf_counter()
             with socket.create_connection((ip, int(port)), timeout=3):
@@ -176,7 +176,7 @@ class Monitor:
             worker = cfg.get("worker", "")
 
             try:
-                port = int(node.get("port", 443))
+                port = int(node.get("port", 22))
             except (TypeError, ValueError):
                 port = 443
             if port < 1 or port > 65535:
