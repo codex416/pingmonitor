@@ -108,6 +108,12 @@
   }
   .ip-type-v4 { color: #007aff; background: rgba(0,122,255,0.10); }
   .ip-type-v6 { color: #5856d6; background: rgba(88,86,214,0.10); }
+  .tcp-port-badge {
+    display: inline-flex; align-items: center; justify-content: center;
+    min-width: 34px; height: 20px; padding: 0 6px; border-radius: 5px;
+    font-size: 10px; font-weight: 700; line-height: 1; flex-shrink: 0;
+    color: #34c759; background: rgba(52,199,89,0.10);
+  }
   .node-ip {
     font-family: inherit;
     font-variant-numeric: tabular-nums;
@@ -964,10 +970,11 @@ function buildNodeStructure(nodes, isRunning) {
               <div class="node-sub-info">
                 <div class="node-ip-wrap">
                   <span class="ip-type-badge ${getIPType(n.ip) === 'IPv6' ? 'ip-type-v6' : 'ip-type-v4'}">${getIPType(n.ip)}</span>
+                  <span class="tcp-port-badge">TCP ${escapeHtml(n.port || 22)}</span>
                   <span class="node-ip"><button class="node-ip-link" type="button" title="点击跳转 ITDOG 检测" onclick="openITDog('${escapeHtml(n.ip)}')">${escapeHtml(n.ip)}</button></span>
                   <button class="node-ip-copy" type="button" title="复制 IP" aria-label="复制 IP" onclick="copyText('${escapeHtml(n.ip)}')"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"></rect><path d="M15 9V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h3"></path></svg></button>
                 </div>
-                <span class="node-location" data-ip="${escapeHtml(n.ip)}" onclick="toggleLocation(this)">TCP ${escapeHtml(n.port || 22)}</span>
+                <span class="node-location" data-ip="${escapeHtml(n.ip)}" onclick="toggleLocation(this)">查询归属地...</span>
               </div>
             </div>
             <div class="node-status-wrapper"><span class="delay-text node-delay">-</span></div>
