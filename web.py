@@ -105,32 +105,50 @@ def save_ip_cache(cache):
     save_json_atomic(IP_CACHE_FILE, cache)
 
 
+def resolve_domain_ips(domain):
+    """解析域名的 A / AAAA 记录，分别返回 IPv4 和 IPv6。"""
+    domain = str(domain or "").strip().rstrip(".")
+    if not domain:
+        return "", "", ""
+
+    try:
+        ipaddress.ip_address(domain.strip("[]"))
+        return domain, "", ""
+    except ValueError:
+        pass
+
+    ipv4_list = []
+    ipv6_list = []
+    try:
+        infos = socket.getaddrinfo(domain, None, type=socket.SOCK_STREAM)
+        for info in infos:
+            addr = str(info[4][0]).split("%", 1)[0]
+            try:
+                parsed = ipaddress.ip_address(addr)
+            except ValueError:
+                continue
+            if parsed.version == 4 and addr not in ipv4_list:
+                ipv4_list.append(addr)
+            elif parsed.version == 6 and addr not in ipv6_list:
+                ipv6_list.append(addr)
+    except Exception:
+        return domain, "", ""
+
+    return domain, (ipv4_list[0] if ipv4_list else ""), (ipv6_list[0] if ipv6_list else "")
+
+
 def normalize_lookup_target(target):
-    """IP 直接使用；域名由服务器端 DNS 解析为一个可查询 IP。"""
+    """IP 直接使用；域名查询时优先返回 IPv4，否则返回 IPv6。"""
     target = str(target or "").strip()
     if not target:
         return "", ""
-
-    # 允许用户输入 [IPv6] 形式。
     candidate = target[1:-1] if target.startswith("[") and target.endswith("]") else target
     try:
         return target, str(ipaddress.ip_address(candidate))
     except ValueError:
         pass
-
-    try:
-        infos = socket.getaddrinfo(target, None, type=socket.SOCK_STREAM)
-        # 优先 IPv4，与大多数 VPS 节点录入习惯保持一致；没有 IPv4 再使用 IPv6。
-        addresses = []
-        for info in infos:
-            addr = info[4][0]
-            if addr not in addresses:
-                addresses.append(addr)
-        ipv4 = next((x for x in addresses if ":" not in x), None)
-        resolved = ipv4 or (addresses[0] if addresses else "")
-        return target, resolved
-    except Exception:
-        return target, ""
+    domain, ipv4, ipv6 = resolve_domain_ips(target)
+    return domain, ipv4 or ipv6
 
 
 
@@ -249,14 +267,47 @@ def api_config():
     return jsonify(load_config())
 
 
+@app.route("/api/resolve-domain", methods=["POST"])
+def resolve_domain():
+    try:
+        data = request.get_json(silent=True) or {}
+        domain = str(data.get("domain", "")).strip()
+        if not domain:
+            return jsonify({"ok": False, "msg": "请输入域名"})
+        try:
+            parsed = ipaddress.ip_address(domain.strip("[]"))
+            return jsonify({"ok": False, "msg": "请输入域名，不要填写 IP 地址"})
+        except ValueError:
+            pass
+        _, ipv4, ipv6 = resolve_domain_ips(domain)
+        if not ipv4 and not ipv6:
+            write_log(f"域名解析失败: [{domain}]")
+            return jsonify({"ok": False, "msg": "域名无法解析到 IPv4/IPv6 地址"})
+        write_log(f"域名解析成功: [{domain}] -> IPv4=[{ipv4 or '未发现'}], IPv6=[{ipv6 or '未发现'}]")
+        return jsonify({"ok": True, "domain": domain, "ipv4": ipv4, "ipv6": ipv6})
+    except Exception as e:
+        write_log(f"域名解析异常: {str(e)}")
+        return jsonify({"ok": False, "error": str(e)})
+
+
 @app.route("/api/add", methods=["POST"])
 def add_node():
     try:
         data = request.get_json(silent=True) or {}
+        domain = str(data.get("domain", "")).strip().rstrip(".")
         legacy_ip = str(data.get("ip", "")).strip()
         ipv4 = str(data.get("ipv4", "")).strip()
         ipv6 = str(data.get("ipv6", "")).strip()
-        # 兼容旧版配置：只有 ip 时继续按旧方式工作。
+
+        if domain:
+            _, resolved4, resolved6 = resolve_domain_ips(domain)
+            if not resolved4 and not resolved6:
+                return jsonify({"ok": False, "msg": "域名无法解析到 IPv4/IPv6 地址"})
+            if not ipv4:
+                ipv4 = resolved4
+            if not ipv6:
+                ipv6 = resolved6
+
         if not ipv4 and not ipv6 and legacy_ip:
             try:
                 parsed = ipaddress.ip_address(legacy_ip.strip("[]"))
@@ -268,8 +319,7 @@ def add_node():
                 ipv4 = legacy_ip
 
         if not ipv4 and not ipv6:
-            write_log("添加节点失败: IPv4 或 IPv6 至少填写一个")
-            return jsonify({"ok": False, "msg": "IPv4 或 IPv6 至少填写一个"})
+            return jsonify({"ok": False, "msg": "IPv4、IPv6 或域名至少填写一个"})
 
         try:
             if ipv4:
@@ -286,17 +336,18 @@ def add_node():
             return jsonify({"ok": False, "msg": "IP 地址格式错误"})
 
         ip = ipv4 or ipv6
-        name = str(data.get("name", "")).strip() or ip
-
+        name = str(data.get("name", "")).strip() or domain or ip
         cfg = load_config()
 
         existing = set()
         for n in cfg.get("nodes", []):
-            existing.add(str(n.get("ip", "")).strip())
-            existing.add(str(n.get("ipv4", "")).strip())
-            existing.add(str(n.get("ipv6", "")).strip())
-        if ipv4 and ipv4 in existing or ipv6 and ipv6 in existing:
-            write_log(f"添加节点失败: 节点 [{ip}] 已存在")
+            existing.update({
+                str(n.get("ip", "")).strip(),
+                str(n.get("ipv4", "")).strip(),
+                str(n.get("ipv6", "")).strip(),
+                str(n.get("domain", "")).strip()
+            })
+        if (ipv4 and ipv4 in existing) or (ipv6 and ipv6 in existing) or (domain and domain in existing):
             return jsonify({"ok": False, "msg": "节点已存在"})
 
         check = str(data.get("check", "both")).strip().lower()
@@ -308,11 +359,15 @@ def add_node():
             port = 443
         if port < 1 or port > 65535:
             return jsonify({"ok": False, "msg": "TCP端口必须为 1-65535"})
-        cfg.setdefault("nodes", []).append({"name": name, "ip": ip, "ipv4": ipv4, "ipv6": ipv6, "check": check, "port": port})
+
+        node = {"name": name, "ip": ip, "ipv4": ipv4, "ipv6": ipv6, "check": check, "port": port}
+        if domain:
+            node["domain"] = domain
+        cfg.setdefault("nodes", []).append(node)
         save_json_atomic(CONFIG_FILE, cfg)
 
-        write_log(f"添加节点成功: 名称=[{name}], IPv4=[{ipv4 or '未填写'}], IPv6=[{ipv6 or '未填写'}]")
-        return jsonify({"ok": True})
+        write_log(f"添加节点成功: 名称=[{name}], 域名=[{domain or '无'}], IPv4=[{ipv4 or '未填写'}], IPv6=[{ipv6 or '未填写'}]")
+        return jsonify({"ok": True, "node": node})
     except Exception as e:
         write_log(f"添加节点异常: {str(e)}")
         return jsonify({"ok": False, "error": str(e)})
@@ -364,6 +419,7 @@ def edit_node():
         legacy_ip = str(data.get("ip", "")).strip()
         ipv4 = str(data.get("ipv4", "")).strip()
         ipv6 = str(data.get("ipv6", "")).strip()
+        domain = str(data.get("domain", "")).strip().rstrip(".")
 
         if not ipv4 and not ipv6 and legacy_ip:
             try:
@@ -374,6 +430,13 @@ def edit_node():
                     ipv6 = legacy_ip
             except ValueError:
                 ipv4 = legacy_ip
+
+        if domain:
+            _, resolved4, resolved6 = resolve_domain_ips(domain)
+            if not resolved4 and not resolved6:
+                return jsonify({"ok": False, "msg": "域名无法解析到 IPv4/IPv6 地址"})
+            if not ipv4: ipv4 = resolved4
+            if not ipv6: ipv6 = resolved6
 
         if not old_ip or (not ipv4 and not ipv6):
             write_log("编辑节点失败: IPv4 或 IPv6 至少填写一个")
@@ -418,6 +481,10 @@ def edit_node():
         if port < 1 or port > 65535:
             return jsonify({"ok": False, "msg": "TCP端口必须为 1-65535"})
         target["name"] = new_name
+        if domain:
+            target["domain"] = domain
+        else:
+            target.pop("domain", None)
         target["ip"] = new_ip
         target["ipv4"] = ipv4
         target["ipv6"] = ipv6
