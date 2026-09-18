@@ -129,9 +129,7 @@
   }
 
 
-  /* ----------------------------------------------------
-     修改：归属地独立占满第二行、超过部分截断可点击展开
-  ---------------------------------------------------- */
+  /* 归属地显示在对应 IP 下一行 */
 
   .node-ip-link {
     border: none; font: inherit; color: inherit; cursor: pointer; background: transparent; padding: 0;
@@ -716,7 +714,7 @@
 <style>
 .dual-ip-inputs{display:grid;grid-template-columns:1fr 1fr;gap:8px;width:100%}
 .node-ip-list{display:flex;flex-direction:column;gap:4px;width:100%}
-.node-address-line{display:flex;align-items:center;gap:5px;min-width:0 flex-wrap:wrap;}
+.node-address-line{display:flex;flex-direction:column;align-items:flex-start;gap:2px;width:100%;min-width:0;}
 .node-address-line .node-ip{min-width:0}
 @media(max-width:600px){.dual-ip-inputs{grid-template-columns:1fr}.node-address-line .node-ip{flex:1;min-width:0}}
 </style>
