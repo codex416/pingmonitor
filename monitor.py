@@ -230,7 +230,7 @@ class Monitor:
                 self.notify(node, worker)
 
                 # 标记停止，不删除
-                self.running_nodes[ip] = "stopped"
+                self.running_nodes[ip] = {"state": "stopped", "target_signature": target_signature}
                 break
 
     def manager(self):
@@ -239,15 +239,43 @@ class Monitor:
 
             for node in cfg.get("nodes", []):
                 ip = node["ip"]
+                port = int(node.get("port", 22) or 22)
+                target_version = int(node.get("_target_version", 0) or 0)
+                target_signature = (ip, port, target_version)
 
-                if ip not in self.running_nodes:
-                    self.running_nodes[ip] = "running"
+                current_state = self.running_nodes.get(ip)
+
+                # 没有监控线程：启动。
+                if current_state is None:
+                    self.running_nodes[ip] = {
+                        "state": "running",
+                        "target_signature": target_signature
+                    }
                     threading.Thread(
                         target=self.check_node,
                         args=(node,),
                         daemon=True
                     ).start()
                     self.log(f"启动监控: {node['name']}")
+                    continue
+
+                # 节点此前因故障进入 stopped 状态，但用户修改了 IP/端口：
+                # 必须重新启动监控线程，不能因为 IP 没变就永久停在 stopped。
+                if (
+                    isinstance(current_state, dict)
+                    and current_state.get("state") == "stopped"
+                    and current_state.get("target_signature") != target_signature
+                ):
+                    self.running_nodes[ip] = {
+                        "state": "running",
+                        "target_signature": target_signature
+                    }
+                    threading.Thread(
+                        target=self.check_node,
+                        args=(node,),
+                        daemon=True
+                    ).start()
+                    self.log(f"检测目标已修改，重新启动监控: {node['name']} TCP:{port}")
 
             time.sleep(0.2)
 
