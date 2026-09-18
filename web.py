@@ -253,19 +253,51 @@ def api_config():
 def add_node():
     try:
         data = request.get_json(silent=True) or {}
-        ip = str(data.get("ip", "")).strip()
-        name = str(data.get("name", "")).strip() or ip
+        legacy_ip = str(data.get("ip", "")).strip()
+        ipv4 = str(data.get("ipv4", "")).strip()
+        ipv6 = str(data.get("ipv6", "")).strip()
+        # 兼容旧版配置：只有 ip 时继续按旧方式工作。
+        if not ipv4 and not ipv6 and legacy_ip:
+            try:
+                parsed = ipaddress.ip_address(legacy_ip.strip("[]"))
+                if parsed.version == 4:
+                    ipv4 = legacy_ip
+                else:
+                    ipv6 = legacy_ip
+            except ValueError:
+                ipv4 = legacy_ip
 
-        if not ip:
-            write_log("添加节点失败: IP或域名不能为空")
-            return jsonify({"ok": False, "msg": "IP或域名不能为空"})
+        if not ipv4 and not ipv6:
+            write_log("添加节点失败: IPv4 或 IPv6 至少填写一个")
+            return jsonify({"ok": False, "msg": "IPv4 或 IPv6 至少填写一个"})
+
+        try:
+            if ipv4:
+                parsed4 = ipaddress.ip_address(ipv4.strip("[]"))
+                if parsed4.version != 4:
+                    return jsonify({"ok": False, "msg": "IPv4 地址格式错误"})
+                ipv4 = str(parsed4)
+            if ipv6:
+                parsed6 = ipaddress.ip_address(ipv6.strip("[]"))
+                if parsed6.version != 6:
+                    return jsonify({"ok": False, "msg": "IPv6 地址格式错误"})
+                ipv6 = str(parsed6)
+        except ValueError:
+            return jsonify({"ok": False, "msg": "IP 地址格式错误"})
+
+        ip = ipv4 or ipv6
+        name = str(data.get("name", "")).strip() or ip
 
         cfg = load_config()
 
+        existing = set()
         for n in cfg.get("nodes", []):
-            if n.get("ip") == ip:
-                write_log(f"添加节点失败: 节点 [{ip}] 已存在")
-                return jsonify({"ok": False, "msg": "节点已存在"})
+            existing.add(str(n.get("ip", "")).strip())
+            existing.add(str(n.get("ipv4", "")).strip())
+            existing.add(str(n.get("ipv6", "")).strip())
+        if ipv4 and ipv4 in existing or ipv6 and ipv6 in existing:
+            write_log(f"添加节点失败: 节点 [{ip}] 已存在")
+            return jsonify({"ok": False, "msg": "节点已存在"})
 
         check = str(data.get("check", "both")).strip().lower()
         if check not in {"ping", "tcp", "both"}:
@@ -276,10 +308,10 @@ def add_node():
             port = 443
         if port < 1 or port > 65535:
             return jsonify({"ok": False, "msg": "TCP端口必须为 1-65535"})
-        cfg.setdefault("nodes", []).append({"name": name, "ip": ip, "check": check, "port": port})
+        cfg.setdefault("nodes", []).append({"name": name, "ip": ip, "ipv4": ipv4, "ipv6": ipv6, "check": check, "port": port})
         save_json_atomic(CONFIG_FILE, cfg)
 
-        write_log(f"添加节点成功: 名称=[{name}], IP/域名=[{ip}]")
+        write_log(f"添加节点成功: 名称=[{name}], IPv4=[{ipv4 or '未填写'}], IPv6=[{ipv6 or '未填写'}]")
         return jsonify({"ok": True})
     except Exception as e:
         write_log(f"添加节点异常: {str(e)}")
@@ -329,12 +361,40 @@ def edit_node():
     try:
         data = request.get_json(silent=True) or {}
         old_ip = str(data.get("old_ip", "")).strip()
-        new_ip = str(data.get("ip", "")).strip()
-        new_name = str(data.get("name", "")).strip() or new_ip
+        legacy_ip = str(data.get("ip", "")).strip()
+        ipv4 = str(data.get("ipv4", "")).strip()
+        ipv6 = str(data.get("ipv6", "")).strip()
 
-        if not old_ip or not new_ip:
-            write_log("编辑节点失败: IP或域名不能为空")
-            return jsonify({"ok": False, "msg": "IP或域名不能为空"})
+        if not ipv4 and not ipv6 and legacy_ip:
+            try:
+                parsed = ipaddress.ip_address(legacy_ip.strip("[]"))
+                if parsed.version == 4:
+                    ipv4 = legacy_ip
+                else:
+                    ipv6 = legacy_ip
+            except ValueError:
+                ipv4 = legacy_ip
+
+        if not old_ip or (not ipv4 and not ipv6):
+            write_log("编辑节点失败: IPv4 或 IPv6 至少填写一个")
+            return jsonify({"ok": False, "msg": "IPv4 或 IPv6 至少填写一个"})
+
+        try:
+            if ipv4:
+                parsed4 = ipaddress.ip_address(ipv4.strip("[]"))
+                if parsed4.version != 4:
+                    return jsonify({"ok": False, "msg": "IPv4 地址格式错误"})
+                ipv4 = str(parsed4)
+            if ipv6:
+                parsed6 = ipaddress.ip_address(ipv6.strip("[]"))
+                if parsed6.version != 6:
+                    return jsonify({"ok": False, "msg": "IPv6 地址格式错误"})
+                ipv6 = str(parsed6)
+        except ValueError:
+            return jsonify({"ok": False, "msg": "IP 地址格式错误"})
+
+        new_ip = ipv4 or ipv6
+        new_name = str(data.get("name", "")).strip() or new_ip
 
         cfg = load_config()
         nodes = cfg.get("nodes", [])
@@ -359,6 +419,8 @@ def edit_node():
             return jsonify({"ok": False, "msg": "TCP端口必须为 1-65535"})
         target["name"] = new_name
         target["ip"] = new_ip
+        target["ipv4"] = ipv4
+        target["ipv6"] = ipv6
         target["check"] = check
         target["port"] = port
         save_json_atomic(CONFIG_FILE, cfg)
