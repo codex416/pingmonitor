@@ -683,43 +683,10 @@
   filter: none !important;
 }
 
-
-/* ===== 节点卡片：紧凑信息层级 ===== */
-.node-name-row{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%}
-.node-status-inline{display:inline-flex;align-items:center;gap:5px;flex-shrink:0;font-size:12px;font-weight:600}
-.node-status-inline .node-status-dot{width:7px;height:7px;border-radius:50%;display:inline-block}
-.node-status-text{white-space:nowrap}
-.node-network-section{width:100%;padding-top:2px}
-.node-section-label{font-size:11px;color:var(--text-muted);font-weight:600;margin-bottom:5px}
-.node-network-results{display:flex;flex-direction:column;gap:4px;width:100%}
-.network-result-row{display:grid;grid-template-columns:42px minmax(0,1fr);align-items:center;gap:8px;min-height:24px;font-size:12px}
-.network-family{color:var(--ios-blue);font-weight:700}
-.network-family-v6{color:#5856d6}
-.network-metric{color:var(--text-muted);font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.network-online{color:#248a3d}
-.network-offline{color:var(--ios-red)}
-.network-unavailable{color:#aeaeb2}
-@media(max-width:600px){
-  .node-card{padding:22px 18px;gap:10px}
-  .node-name-row{align-items:flex-start}
-  .node-status-inline{font-size:11px}
-  .network-result-row{grid-template-columns:40px minmax(0,1fr)}
-  .network-metric{white-space:normal}
-}
-
-.node-domain{font-size:12px;color:var(--text-muted);display:block;width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.node-ip-copy svg{width:16px;height:16px;display:block}
 </style>
 <link rel="icon" type="image/x-icon" href="/static/favicon.ico">
 <link rel="shortcut icon" type="image/x-icon" href="/static/favicon.ico">
 <link rel="apple-touch-icon" sizes="180x180" href="/static/favicon.png">
-<style>
-.dual-ip-inputs{display:grid;grid-template-columns:1fr 1fr;gap:8px;width:100%}
-.node-ip-list{display:flex;flex-direction:column;gap:4px;width:100%}
-.node-address-line{display:flex;align-items:center;gap:5px;min-width:0}
-.node-address-line .node-ip{min-width:0}
-@media(max-width:600px){.dual-ip-inputs{grid-template-columns:1fr}.node-address-line .node-ip{flex:1;min-width:0}}
-</style>
 </head>
 <body>
 
@@ -767,20 +734,7 @@
             <div class="ios-card">
               <div class="input-group">
                 <input class="ios-input" id="name" placeholder="节点名称（例如: 香港服务器）">
-                <div class="dual-ip-inputs">
-                  <input class="ios-input" id="ipv4" placeholder="IPv4 地址（可选）" inputmode="numeric" autocomplete="off">
-                  <input class="ios-input" id="ipv6" placeholder="IPv6 地址（可选）" inputmode="text" autocomplete="off">
-                </div>
-                <div style="display:flex;gap:8px;">
-                  <input class="ios-input" id="domain" placeholder="域名（可选，自动解析 IPv4 / IPv6）" autocomplete="off">
-                  <button class="ios-btn ios-btn-secondary" type="button" style="width:80px;flex-shrink:0;" onclick="resolveDomain()">解析</button>
-                </div>
-                <div class="node-check-config">
-                  <div class="node-check-option"><label>检测方式</label><select class="ios-input" id="check">
-                    <option value="both" selected>ICMP + TCPing</option><option value="ping">仅 ICMP</option><option value="tcp">仅 TCPing</option>
-                  </select></div>
-                  <div class="node-check-option"><label>TCPing 端口</label><input class="ios-input" id="port" type="number" min="1" max="65535" value="443" placeholder="443"></div>
-                </div>
+                <input class="ios-input" id="ip" placeholder="IP 地址或域名">
                 <button class="ios-btn" onclick="addNode()">添加节点</button>
               </div>
             </div>
@@ -853,16 +807,9 @@
       <input class="ios-input" id="edit-name" autocomplete="off">
     </div>
     <div class="edit-modal-field">
-      <label>IPv4 / IPv6 地址</label>
-      <div class="dual-ip-inputs">
-        <input class="ios-input" id="edit-ipv4" placeholder="IPv4 地址（可选）" inputmode="numeric" autocomplete="off">
-        <input class="ios-input" id="edit-ipv6" placeholder="IPv6 地址（可选）" inputmode="text" autocomplete="off">
-      </div>
+      <label for="edit-ip">IP 地址或域名</label>
+      <input class="ios-input" id="edit-ip" autocomplete="off">
     </div>
-    <div class="edit-modal-field"><label for="edit-check">检测方式</label><select class="ios-input" id="edit-check">
-      <option value="both">ICMP + TCPing</option><option value="ping">仅 ICMP</option><option value="tcp">仅 TCPing</option>
-    </select></div>
-    <div class="edit-modal-field"><label for="edit-port">TCPing 端口</label><input class="ios-input" id="edit-port" type="number" min="1" max="65535" value="443" autocomplete="off"></div>
     <div class="edit-modal-actions">
       <button class="edit-cancel-btn" type="button" onclick="closeEditModal()">取消</button>
       <button class="edit-save-btn" type="button" onclick="saveEditNode()">保存</button>
@@ -981,8 +928,8 @@ async function refreshIPLocations(nodes) {
 }
 
 function nodeStatusData(node, statusMap, isRunning) {
-    if (!isRunning) return { name: node.name, ip: node.ip, status: "等待检测", delay: "-", last: "-", fail: 0, check: node.check || "ping", port: Number(node.port) || 443 };
-    return statusMap[node.ip] ? { ...statusMap[node.ip] } : { name: node.name, ip: node.ip, status: "检测中", delay: "-", last: "-", fail: 0, check: node.check || "ping", port: Number(node.port) || 443 };
+    if (!isRunning) return { name: node.name, ip: node.ip, status: "等待检测", delay: "-", last: "-", fail: 0 };
+    return statusMap[node.ip] ? { ...statusMap[node.ip] } : { name: node.name, ip: node.ip, status: "检测中", delay: "-", last: "-", fail: 0 };
 }
 
 function getIPType(ip) {
@@ -1001,78 +948,59 @@ function openITDog(ip) {
 }
 
 function buildNodeStructure(nodes, isRunning) {
-    const html = nodes.map(n => {
-        const addresses = [];
-        const copySvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"></rect><path d="M15 9V7a2 2 0 0 0-2-2H7a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"></path></svg>';
-        if (n.ipv4) addresses.push(`<div class="node-address-line"><span class="ip-type-badge ip-type-v4">IPv4</span><span class="node-ip"><button class="node-ip-link" type="button" title="点击跳转 ITDOG 检测" onclick="openITDog('${escapeHtml(n.ipv4)}')">${escapeHtml(n.ipv4)}</button></span><button class="node-ip-copy" type="button" title="复制 IPv4" onclick="copyText('${escapeHtml(n.ipv4)}')">${copySvg}</button></div>`);
-        if (n.ipv6) addresses.push(`<div class="node-address-line"><span class="ip-type-badge ip-type-v6">IPv6</span><span class="node-ip"><button class="node-ip-link" type="button" title="点击跳转 ITDOG IPv6 检测" onclick="openITDog('${escapeHtml(n.ipv6)}')">${escapeHtml(n.ipv6)}</button></span><button class="node-ip-copy" type="button" title="复制 IPv6" onclick="copyText('${escapeHtml(n.ipv6)}')">${copySvg}</button></div>`);
-        const domainLine = n.domain ? `<span class="node-domain" title="${escapeHtml(n.domain)}">域名：${escapeHtml(n.domain)}</span>` : '';
-        return `
+    const html = nodes.map(n => `
         <div class="node-card" data-ip="${escapeHtml(n.ip)}">
-          <button class="node-sort-handle" type="button" aria-label="拖动排序"><span></span><span></span><span></span></button>
+          <button class="node-sort-handle" type="button" aria-label="拖动排序">
+            <span></span><span></span><span></span>
+          </button>
           <div class="node-top-row">
             <div class="node-identity">
               <span class="node-name" title="${escapeHtml(n.name || '未命名')}"><i class="node-status-dot badge-checking node-status"></i>${escapeHtml(n.name || '未命名')}</span>
               <div class="node-sub-info">
-                <div class="node-ip-list">${addresses.join('')}</div>
-                ${domainLine}
+                <div class="node-ip-wrap">
+                  <span class="ip-type-badge ${getIPType(n.ip) === 'IPv6' ? 'ip-type-v6' : 'ip-type-v4'}">${getIPType(n.ip)}</span>
+                  <span class="node-ip"><button class="node-ip-link" type="button" title="点击跳转 ITDOG 检测" onclick="openITDog('${escapeHtml(n.ip)}')">${escapeHtml(n.ip)}</button></span>
+                  <button class="node-ip-copy" type="button" title="复制 IP" aria-label="复制 IP" onclick="copyText('${escapeHtml(n.ip)}')"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"></rect><path d="M15 9V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h3"></path></svg></button>
+                </div>
                 <span class="node-location" data-ip="${escapeHtml(n.ip)}" onclick="toggleLocation(this)">查询归属地...</span>
               </div>
             </div>
-          </div>
-          <div class="node-network-results">
-            ${n.ipv4 ? '<div class="network-result-row" data-family-row="ipv4"><span class="network-family">IPv4</span><span class="network-metric" data-role="ipv4-metric">--</span></div>' : ''}
-            ${n.ipv6 ? '<div class="network-result-row" data-family-row="ipv6"><span class="network-family network-family-v6">IPv6</span><span class="network-metric" data-role="ipv6-metric">--</span></div>' : ''}
+            <div class="node-status-wrapper"><span class="delay-text node-delay">-</span></div>
           </div>
           <div class="node-bottom-row">
-            <div class="node-stats-group"><span>最后检测: <strong class="stat-val node-last">-</strong></span><span class="fail-tag node-fail" hidden></span></div>
+            <div class="node-stats-group">
+              <span>最后检测: <strong class="stat-val node-last">-</strong></span>
+              <span class="fail-tag node-fail" hidden></span>
+            </div>
             <div class="node-action-group">
               <button class="action-btn-sm edit-btn" onclick="openEditModal('${escapeHtml(n.ip)}')">编辑</button>
               <button class="action-btn-sm del-btn" onclick="delNode('${escapeHtml(n.ip)}')">删除</button>
             </div>
           </div>
-        </div>`;
-    }).join('');
-    return '<div class="node-cards-grid' + (sortMode ? ' sorting' : '') + '">' + html + '</div>';
-}
+        </div>`).join('');
 
-function updateNetworkRow(card, role, family, check, port) {
-    const m = card.querySelector(`[data-role="${role}-metric"]`);
-    if (!m) return;
-    if (!family || !family.available) {
-        m.innerText = "检测失败";
-        m.className = "network-metric network-unavailable";
-        return;
-    }
-    const ic = family.icmp || {};
-    const tcp = family.tcp || {};
-    const parts = [];
-    if (check === "ping" || check === "both") {
-        parts.push(ic.status === "online" ? `ICMP ${ic.delay ?? "-"}ms` : "ICMP 失败");
-    }
-    if (check === "tcp" || check === "both") {
-        parts.push(tcp.status === "online" ? `TCP ${port} ${tcp.delay ?? "-"}ms` : `TCP ${port} 失败`);
-    }
-    m.innerText = parts.join(" · ") || "—";
-    m.className = "network-metric " + (family.status === "online" ? "network-online" : "network-offline");
+    return '<div class="node-cards-grid' + (sortMode ? ' sorting' : '') + '">' + html + '</div>';
 }
 
 function updateNodeCard(card, item) {
     if (!card) return;
     const statusEl = card.querySelector('.node-status');
-    const statusTextEl = card.querySelector('.node-status-text');
+    const delayEl = card.querySelector('.node-delay');
     const lastEl = card.querySelector('.node-last');
     const failEl = card.querySelector('.node-fail');
-    const rawStatus = String(item.status || "checking").toLowerCase();
-    const status = rawStatus === "online" || rawStatus === "在线" ? "在线" : (rawStatus === "offline" || rawStatus === "离线" ? "离线" : "检测中");
-    const check = item.check || "ping";
-    const port = Number(item.port) || 443;
-    const failCount = parseInt(item.fail) || 0;
+    const status = item.status || "检测中";
+    const numDelay = parseInt(item.delay);
     const badgeCls = status === "在线" ? "badge-online" : (status === "离线" ? "badge-offline" : "badge-checking");
-    if (statusEl) statusEl.className = "node-status-dot node-status " + badgeCls;
-    if (statusTextEl) statusTextEl.innerText = status;
-    updateNetworkRow(card, "ipv4", item.ipv4, check, port);
-    updateNetworkRow(card, "ipv6", item.ipv6, check, port);
+    const delayCls = !isNaN(numDelay) ? (numDelay < 150 ? 'delay-good' : (numDelay < 400 ? 'delay-medium' : 'delay-bad')) : "";
+    const failCount = parseInt(item.fail) || 0;
+
+    if (statusEl) {
+        statusEl.className = "node-status-dot node-status " + badgeCls;
+    }
+    if (delayEl) {
+        delayEl.className = "delay-text node-delay " + delayCls;
+        delayEl.innerText = String(item.delay ?? "-");
+    }
     if (lastEl) lastEl.innerText = String(item.last ?? "-");
     if (failEl) {
         failEl.hidden = failCount <= 0;
@@ -1082,7 +1010,7 @@ function updateNodeCard(card, item) {
 
 function renderNodeStructureIfNeeded(nodes, isRunning) {
     const signature = JSON.stringify({
-        nodes: nodes.map(n => ({ name: n.name || "", ip: n.ip || "", domain: n.domain || "", ipv4: n.ipv4 || "", ipv6: n.ipv6 || "", check: n.check || "ping", port: Number(n.port) || 443 })),
+        nodes: nodes.map(n => ({ name: n.name || "", ip: n.ip || "" })),
         running: !!isRunning,
         sorting: !!sortMode
     });
@@ -1110,9 +1038,8 @@ function updateNodeCards(nodes, status, isRunning) {
 
     nodes.forEach(n => {
         const item = nodeStatusData(n, statusMap, isRunning);
-        const normalizedStatus = String(item.status || "").toLowerCase();
-        if (normalizedStatus === "online" || normalizedStatus === "在线") totalOnline++;
-        if (normalizedStatus === "offline" || normalizedStatus === "离线") totalOffline++;
+        if (item.status === "在线") totalOnline++;
+        if (item.status === "离线") totalOffline++;
         const numDelay = parseInt(item.delay);
         if (!isNaN(numDelay)) { totalDelay += numDelay; delayCount++; }
         const card = document.querySelector('.node-card[data-ip="' + cssEscape(n.ip) + '"]');
@@ -1217,43 +1144,14 @@ async function apiPost(url, data, successMsg) {
     }
 }
 
-async function resolveDomain(showMessage = true) {
-    const domain = $("domain").value.trim();
-    if (!domain) { if (showMessage) showToast("请输入域名"); return null; }
-    try {
-        const res = await fetch("/api/resolve-domain", {
-            method: "POST", headers: {"Content-Type":"application/json"},
-            body: JSON.stringify({domain})
-        });
-        const json = await res.json().catch(() => ({}));
-        if (!res.ok || json.ok === false) { showToast(json.msg || json.error || "域名解析失败"); return null; }
-        $("ipv4").value = json.ipv4 || "";
-        $("ipv6").value = json.ipv6 || "";
-        if (showMessage) showToast("域名解析成功");
-        return json;
-    } catch {
-        showToast("域名解析失败");
-        return null;
-    }
-}
-
 async function addNode(){
-    const name = $("name").value.trim();
-    const domain = $("domain").value.trim();
-    const ipv4 = $("ipv4").value.trim();
-    const ipv6 = $("ipv6").value.trim();
-    if (!domain && !ipv4 && !ipv6) { showToast("IPv4、IPv6 或域名至少填写一个"); return; }
-    if (domain && !ipv4 && !ipv6) {
-        const resolved = await resolveDomain(false);
-        if (!resolved) return;
-    }
-    const finalIpv4 = $("ipv4").value.trim();
-    const finalIpv6 = $("ipv6").value.trim();
-    const check = $("check").value, port = Number($("port").value || 443);
-    if (port < 1 || port > 65535) { showToast("TCP端口必须为 1-65535"); return; }
-    const result = await apiPost("/api/add", { name, domain, ipv4: finalIpv4, ipv6: finalIpv6, check, port }, "节点添加成功");
+    const name = $("name").value.trim(), ip = $("ip").value.trim();
+    if (!ip) { showToast("请输入有效的 IP 地址或域名"); return; }
+    
+    const result = await apiPost("/api/add", { name, ip }, "节点添加成功");
     if (result) {
-        $("name").value = ""; $("domain").value = ""; $("ipv4").value = ""; $("ipv6").value = "";
+        $("name").value = "";
+        $("ip").value = "";
     }
 }
 
@@ -1406,11 +1304,7 @@ async function openEditModal(ip) {
     if (!node) { showToast("未找到该节点"); return; }
     editingOriginalIP = ip;
     $("edit-name").value = node.name || "";
-    if ($("edit-domain")) $("edit-domain").value = node.domain || "";
-    $("edit-ipv4").value = node.ipv4 || (node.ip && !String(node.ip).includes(":") ? node.ip : "");
-    $("edit-ipv6").value = node.ipv6 || (node.ip && String(node.ip).includes(":") ? node.ip : "");
-    $("edit-check").value = node.check || "ping";
-    $("edit-port").value = Number(node.port) || 443;
+    $("edit-ip").value = node.ip || "";
     $("edit-modal-overlay").classList.add("open");
     setTimeout(() => $("edit-name").focus(), 50);
 }
@@ -1422,30 +1316,14 @@ function closeEditModal() {
 
 async function saveEditNode() {
     const name = $("edit-name").value.trim();
-    const ipv4 = $("edit-ipv4").value.trim();
-    const ipv6 = $("edit-ipv6").value.trim();
-    const domain = $("edit-domain") ? $("edit-domain").value.trim() : "";
-    if (!domain && !ipv4 && !ipv6) { showToast("IPv4、IPv6 或域名至少填写一个"); return; }
+    const ip = $("edit-ip").value.trim();
+    if (!ip) { showToast("请输入有效的 IP 地址或域名"); return; }
     if (!editingOriginalIP) { closeEditModal(); return; }
 
-    const check = $("edit-check").value, port = Number($("edit-port").value || 443);
-    if (port < 1 || port > 65535) { showToast("TCP端口必须为 1-65535"); return; }
-    let finalIpv4 = ipv4;
-    let finalIpv6 = ipv6;
-    if (domain && !finalIpv4 && !finalIpv6) {
-        const resolved = await fetch("/api/resolve-domain", {
-            method: "POST", headers: {"Content-Type":"application/json"},
-            body: JSON.stringify({domain})
-        }).then(r => r.json()).catch(() => null);
-        if (!resolved || resolved.ok === false) { showToast(resolved?.msg || "域名解析失败"); return; }
-        finalIpv4 = resolved.ipv4 || "";
-        finalIpv6 = resolved.ipv6 || "";
-    }
-    const result = await apiPost("/api/edit", { old_ip: editingOriginalIP, name, domain, ipv4: finalIpv4, ipv6: finalIpv6, check, port }, "节点信息已更新");
+    const result = await apiPost("/api/edit", { old_ip: editingOriginalIP, name, ip }, "节点信息已更新");
     if (result) {
         delete ipLocationCache[editingOriginalIP];
-        delete ipLocationCache[ipv4];
-        delete ipLocationCache[ipv6];
+        delete ipLocationCache[ip];
         closeEditModal();
     }
 }
@@ -1603,3 +1481,14 @@ document.addEventListener("visibilitychange", () => {
 </script>
 </body>
 </html>
+
+<style>
+.node-ip, .node-ip .node-ip-link, .node-ip-link { font-size: 14px !important; }
+</style>
+<style>
+/* IP 与复制按钮同步放大，并缩小两者间距 */
+.node-ip-wrap { gap: 3px !important; }
+.node-ip { gap: 3px !important; }
+.node-ip-copy { width: 28px !important; height: 28px !important; margin-left: 0 !important; }
+.node-ip-copy svg { width: 18px !important; height: 18px !important; stroke-width: 1.9 !important; }
+</style>
