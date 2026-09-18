@@ -180,7 +180,7 @@ class Monitor:
             self.log(f"{name} TCP:{port} 第二次失败")
             time.sleep(5)
 
-            ok, _ = self.ping(ip)
+            ok, _ = self.ping(ip, port)
             if ok:
                 continue
 
