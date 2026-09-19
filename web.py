@@ -267,15 +267,7 @@ def add_node():
                 write_log(f"添加节点失败: 节点 [{ip}] 已存在")
                 return jsonify({"ok": False, "msg": "节点已存在"})
 
-        port = data.get("port", 22)
-        try:
-            port = int(port)
-        except (TypeError, ValueError):
-            return jsonify({"ok": False, "msg": "端口必须是 1-65535"})
-        if port < 1 or port > 65535:
-            return jsonify({"ok": False, "msg": "端口必须是 1-65535"})
-
-        cfg.setdefault("nodes", []).append({"name": name, "ip": ip, "port": port})
+        cfg.setdefault("nodes", []).append({"name": name, "ip": ip})
         save_json_atomic(CONFIG_FILE, cfg)
 
         write_log(f"添加节点成功: 名称=[{name}], IP/域名=[{ip}]")
@@ -330,13 +322,6 @@ def edit_node():
         old_ip = str(data.get("old_ip", "")).strip()
         new_ip = str(data.get("ip", "")).strip()
         new_name = str(data.get("name", "")).strip() or new_ip
-        port = data.get("port", 22)
-        try:
-            port = int(port)
-        except (TypeError, ValueError):
-            return jsonify({"ok": False, "msg": "端口必须是 1-65535"})
-        if port < 1 or port > 65535:
-            return jsonify({"ok": False, "msg": "端口必须是 1-65535"})
 
         if not old_ip or not new_ip:
             write_log("编辑节点失败: IP或域名不能为空")
@@ -354,52 +339,22 @@ def edit_node():
             write_log(f"编辑节点失败: 节点 [{new_ip}] 已存在")
             return jsonify({"ok": False, "msg": "新 IP/域名已存在"})
 
-        target_changed = (
-            str(target.get("ip", "")).strip() != new_ip
-            or int(target.get("port", 22) or 22) != port
-        )
-
         target["name"] = new_name
         target["ip"] = new_ip
-        target["port"] = port
-
-        # 每次修改检测目标(IP/域名或端口)都递增版本号。
-        # 即使用户改成其他目标后又立即改回原目标，也能确保监控线程识别到变化并立即重测。
-        if target_changed:
-            target["_target_version"] = int(target.get("_target_version", 0) or 0) + 1
-
         save_json_atomic(CONFIG_FILE, cfg)
 
-        # IP/域名改变时：
-        # 1. 删除旧 IP 状态，避免旧节点残留；
-        # 2. 立即为新 IP 创建“检测中”状态；
-        # 3. monitor.py 随后会接管新目标并立即进行 TCP 检测。
-        # 这样即使旧节点此前已经是“停止检测”，修改 IP 后也不会等第一次 ping 完成才显示新状态。
-        if old_ip != new_ip:
+        # IP 改变后清理旧状态，避免旧 IP 残留在面板。
+        if old_ip != new_ip and os.path.exists(STATUS_FILE):
             try:
-                status = {}
-                if os.path.exists(STATUS_FILE):
-                    with open(STATUS_FILE, "r", encoding="utf-8") as f:
-                        status = json.load(f)
-
+                with open(STATUS_FILE, "r", encoding="utf-8") as f:
+                    status = json.load(f)
                 if old_ip in status:
                     del status[old_ip]
-
-                status[new_ip] = {
-                    "name": new_name,
-                    "ip": new_ip,
-                    "port": port,
-                    "status": "检测中",
-                    "delay": "-",
-                    "fail": 0,
-                    "last": time.strftime("%Y-%m-%d %H:%M:%S")
-                }
-                save_json_atomic(STATUS_FILE, status)
+                    save_json_atomic(STATUS_FILE, status)
             except Exception as e:
-                print(f"[Warning] 编辑节点切换 IP 状态失败: {e}")
+                print(f"[Warning] 编辑节点清理旧状态失败: {e}")
 
-        # 同 IP 编辑：名称直接同步；如果端口发生变化，立即把界面状态切换为“检测中”。
-        # 这样 IP 不变时，端口修改也与 IP 修改保持完全一致的 UI 行为。
+        # 仅修改名称时，同步现有状态中的名称。
         if old_ip == new_ip and os.path.exists(STATUS_FILE):
             try:
                 with open(STATUS_FILE, "r", encoding="utf-8") as f:
@@ -407,12 +362,6 @@ def edit_node():
                 if new_ip in status:
                     status[new_ip]["name"] = new_name
                     status[new_ip]["ip"] = new_ip
-                    status[new_ip]["port"] = port
-                    if target_changed:
-                        status[new_ip]["status"] = "检测中"
-                        status[new_ip]["delay"] = "-"
-                        status[new_ip]["fail"] = 0
-                        status[new_ip]["last"] = time.strftime("%Y-%m-%d %H:%M:%S")
                     save_json_atomic(STATUS_FILE, status)
             except Exception as e:
                 print(f"[Warning] 编辑节点同步状态失败: {e}")
