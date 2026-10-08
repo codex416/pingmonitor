@@ -43,8 +43,15 @@ if [[ "$SCRIPT_DIR" != "$APP_DIR" ]]; then
         --exclude 'last_action.json.tmp' \
         --exclude 'ip_cache.json' \
         --exclude 'ip_cache.json.tmp' \
-        --exclude '__pycache__/' \
+        --exclude '__pycache__/' \\
+        --exclude '.session_secret' \\
         "$SCRIPT_DIR/" "$APP_DIR/"
+fi
+
+# 首次安装时复制默认配置；已有安装则保留现有 config.json，
+# 其中可能包含通过控制面板设置的 Web 密码哈希。
+if [[ ! -f "$APP_DIR/config.json" ]]; then
+    cp "$SCRIPT_DIR/config.json" "$APP_DIR/config.json"
 fi
 
 echo "设置运行目录和文件权限"
@@ -56,6 +63,12 @@ chown -R root:root "$APP_DIR"
 find "$APP_DIR" -type d -exec chmod 755 {} \;
 find "$APP_DIR" -type f -exec chmod 644 {} \;
 chmod +x "$APP_DIR/install.sh"
+
+# Session 密钥只允许 root 和 Web 服务用户读取。
+if [[ -f "$APP_DIR/.session_secret" ]]; then
+    chown www-data:www-data "$APP_DIR/.session_secret"
+    chmod 640 "$APP_DIR/.session_secret"
+fi
 
 # web.py 和 monitor.py 都会使用“临时文件 + os.replace()”原子写入 JSON。
 # 因此 /opt/pingmonitor 本身必须允许 www-data 创建/替换运行时 JSON 临时文件。
@@ -126,4 +139,6 @@ echo "cd $APP_DIR && git pull"
 echo ""
 echo "Web 管理地址:"
 echo "http://${IP}:5000"
+echo "初始登录密码: 123456"
+echo "修改密码: 编辑 /opt/pingmonitor/pingmonitor-web.service 中的 PINGMONITOR_PASSWORD 后执行 systemctl restart pingmonitor-web"
 echo "=============================="
