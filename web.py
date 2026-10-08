@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-from flask import Flask, request, jsonify, render_template
+from flask import Flask, request, jsonify, render_template, redirect, url_for, session
 from collections import deque
 import json
 import os
@@ -10,6 +10,9 @@ import time
 import socket
 import ipaddress
 import threading
+import secrets
+import hashlib
+from functools import wraps
 from urllib.request import Request, urlopen
 from urllib.parse import quote
 
@@ -27,6 +30,111 @@ IP_CACHE_LOCK = threading.Lock()
 IP_API_URL = "http://ip-api.com/json/"
 
 app = Flask(__name__, template_folder="templates")
+
+# Web 登录配置
+SESSION_SECRET_FILE = os.path.join(BASE_DIR, ".session_secret")
+DEFAULT_WEB_PASSWORD = "123456"
+
+def load_session_secret():
+    """读取或生成持久化 Session 密钥。"""
+    try:
+        if os.path.exists(SESSION_SECRET_FILE):
+            with open(SESSION_SECRET_FILE, "r", encoding="utf-8") as f:
+                value = f.read().strip()
+                if len(value) >= 32:
+                    return value
+
+        value = secrets.token_hex(32)
+        with open(SESSION_SECRET_FILE, "w", encoding="utf-8") as f:
+            f.write(value)
+        try:
+            os.chmod(SESSION_SECRET_FILE, 0o640)
+        except OSError:
+            pass
+        return value
+    except Exception as e:
+        print(f"[Auth] 无法保存 Session 密钥，使用临时密钥: {e}")
+        return secrets.token_hex(32)
+
+app.secret_key = os.environ.get("PINGMONITOR_SECRET_KEY") or load_session_secret()
+app.config.update(
+    SESSION_COOKIE_HTTPONLY=True,
+    SESSION_COOKIE_SAMESITE="Lax",
+    SESSION_COOKIE_SECURE=False,
+    PERMANENT_SESSION_LIFETIME=86400,
+)
+
+def _password_hash(password, salt=None):
+    """使用 PBKDF2-SHA256 保存密码，不保存明文。"""
+    if salt is None:
+        salt = secrets.token_bytes(16)
+    digest = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt, 310000)
+    return f"pbkdf2_sha256$310000${salt.hex()}${digest.hex()}"
+
+
+def _verify_password(password, encoded):
+    try:
+        scheme, iterations, salt_hex, digest_hex = str(encoded).split("$", 3)
+        if scheme != "pbkdf2_sha256":
+            return False
+        iterations = int(iterations)
+        salt = bytes.fromhex(salt_hex)
+        expected = bytes.fromhex(digest_hex)
+        actual = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt, iterations)
+        return secrets.compare_digest(actual, expected)
+    except (ValueError, TypeError):
+        return False
+
+
+def get_web_password():
+    """兼容旧版：没有前端修改过密码时，从 systemd 环境变量读取初始密码。"""
+    cfg = load_config()
+    stored_hash = cfg.get("web_password_hash")
+    if stored_hash:
+        return stored_hash
+    return os.environ.get("PINGMONITOR_PASSWORD", DEFAULT_WEB_PASSWORD)
+
+
+def verify_web_password(password):
+    value = get_web_password()
+    if str(value).startswith("pbkdf2_sha256$"):
+        return _verify_password(password, value)
+    return secrets.compare_digest(password, str(value))
+
+
+def change_web_password(new_password):
+    cfg = load_config()
+    cfg["web_password_hash"] = _password_hash(new_password)
+    save_json_atomic(CONFIG_FILE, cfg)
+
+def is_logged_in():
+    return bool(session.get("authenticated"))
+
+def login_required(view):
+    @wraps(view)
+    def wrapped(*args, **kwargs):
+        if is_logged_in():
+            return view(*args, **kwargs)
+
+        if request.path.startswith("/api/"):
+            return jsonify({"ok": False, "error": "未登录", "login_required": True}), 401
+
+        return redirect(url_for("login"))
+    return wrapped
+
+@app.before_request
+def require_login():
+    # 登录页面、登录接口、静态资源不需要登录。
+    if request.endpoint in {"login", "do_login"} or request.path.startswith("/static/"):
+        return None
+
+    if not is_logged_in():
+        if request.path.startswith("/api/"):
+            return jsonify({"ok": False, "error": "未登录", "login_required": True}), 401
+        return redirect(url_for("login"))
+
+    return None
+
 
 
 # =====================
@@ -239,6 +347,31 @@ def set_last_action(action_str):
 # 路由接口
 # =====================
 
+@app.route("/login", methods=["GET"])
+def login():
+    if is_logged_in():
+        return redirect(url_for("index"))
+    return render_template("login.html")
+
+@app.route("/login", methods=["POST"])
+def do_login():
+    data = request.get_json(silent=True) or request.form
+    password = str(data.get("password", ""))
+    if verify_web_password(password):
+        session.clear()
+        session["authenticated"] = True
+        session.permanent = True
+        return jsonify({"ok": True})
+
+    return jsonify({"ok": False, "error": "密码错误"}), 401
+
+@app.route("/logout", methods=["GET", "POST"])
+def logout():
+    session.clear()
+    if request.method == "POST":
+        return jsonify({"ok": True})
+    return redirect(url_for("login"))
+
 @app.route("/")
 def index():
     return render_template("index.html")
@@ -246,7 +379,37 @@ def index():
 
 @app.route("/api/config")
 def api_config():
-    return jsonify(load_config())
+    cfg = load_config()
+    # 密码哈希只保存在服务器端，绝不通过 API 返回到浏览器。
+    cfg.pop("web_password_hash", None)
+    return jsonify(cfg)
+
+
+@app.route("/api/change-password", methods=["POST"])
+def api_change_password():
+    data = request.get_json(silent=True) or {}
+    current_password = str(data.get("current_password", ""))
+    new_password = str(data.get("new_password", ""))
+    confirm_password = str(data.get("confirm_password", ""))
+
+    if not current_password:
+        return jsonify({"ok": False, "error": "请输入当前密码"}), 400
+    if not verify_web_password(current_password):
+        return jsonify({"ok": False, "error": "当前密码错误"}), 400
+    if len(new_password) < 8:
+        return jsonify({"ok": False, "error": "新密码至少 8 位"}), 400
+    if new_password != confirm_password:
+        return jsonify({"ok": False, "error": "两次输入的新密码不一致"}), 400
+    if new_password == current_password:
+        return jsonify({"ok": False, "error": "新密码不能与当前密码相同"}), 400
+
+    try:
+        change_web_password(new_password)
+        write_log("Web 管理密码已修改")
+        return jsonify({"ok": True, "message": "密码修改成功"})
+    except Exception as e:
+        print(f"[Auth] 修改 Web 密码失败: {e}")
+        return jsonify({"ok": False, "error": "密码保存失败，请检查服务器权限"}), 500
 
 
 @app.route("/api/add", methods=["POST"])
